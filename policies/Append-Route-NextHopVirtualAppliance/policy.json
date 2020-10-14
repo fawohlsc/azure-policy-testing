@@ -1,0 +1,70 @@
+{
+    "properties": {
+        "displayName": "Append-Route-NextHopVirtualAppliance",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+            "category": "Network"
+        },
+        "parameters": {
+            "routeTableSettings": {
+                "type": "Object",
+                "metadata": {
+                    "displayName": "Route Table Settings",
+                    "description": "Location-specific settings for route tables."
+                }
+            }
+        },
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Network/routeTables"
+                    },
+                    {
+                        "count": {
+                            "field": "Microsoft.Network/routeTables/routes[*]",
+                            "where": {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
+                                        "equals": "0.0.0.0/0"
+                                    },
+                                    {
+                                        "field": "Microsoft.Network/routeTables/routes[*].nextHopType",
+                                        "equals": "VirtualAppliance"
+                                    },
+                                    {
+                                        "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
+                                        "equals": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                                    }
+                                ]
+                            }
+                        },
+                        "equals": 0
+                    }
+                ]
+            },
+            "then": {
+                "effect": "append",
+                "details": [
+                    {
+                        "field": "Microsoft.Network/routeTables/routes[*]",
+                        "value": {
+                            "name": "internet",
+                            "properties": {
+                                "addressPrefix": "0.0.0.0/0",
+                                "nextHopType": "VirtualAppliance",
+                                "nextHopIpAddress": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "id": "/subscriptions/#{AZURE_SUBSCRIPTION_ID}#/providers/Microsoft.Authorization/policyDefinitions/e40e326a-2592-4a41-a3f6-d9621b2eac0d",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "name": "e40e326a-2592-4a41-a3f6-d9621b2eac0d"
+}

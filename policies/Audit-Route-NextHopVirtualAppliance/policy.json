@@ -1,0 +1,57 @@
+{
+    "properties": {
+        "displayName": "Audit-Route-NextHopVirtualAppliance",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+            "category": "Network"
+        },
+        "parameters": {
+            "routeTableSettings": {
+                "type": "Object",
+                "metadata": {
+                    "displayName": "Route Table Settings",
+                    "description": "Location-specific settings for route tables."
+                }
+            }
+        },
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Network/routeTables"
+                    },
+                    {
+                        "count": {
+                            "field": "Microsoft.Network/routeTables/routes[*]",
+                            "where": {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
+                                        "equals": "0.0.0.0/0"
+                                    },
+                                    {
+                                        "field": "Microsoft.Network/routeTables/routes[*].nextHopType",
+                                        "equals": "VirtualAppliance"
+                                    },
+                                    {
+                                        "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
+                                        "equals": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                                    }
+                                ]
+                            }
+                        },
+                        "equals": 0
+                    }
+                ]
+            },
+            "then": {
+                "effect": "audit"
+            }
+        }
+    },
+    "id": "/subscriptions/90ec6d13-614a-4eca-a69b-79e4f84f20ab/providers/Microsoft.Authorization/policyDefinitions/e33cae20-0c29-4a93-827f-a7bc8ae4e254",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "name": "e33cae20-0c29-4a93-827f-a7bc8ae4e254"
+}

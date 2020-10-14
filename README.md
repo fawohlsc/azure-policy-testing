@@ -1,4 +1,4 @@
-![](https://github.com/fawohlsc/azure-policy-testing/workflows/test-policies/badge.svg)
+![test-policies](https://github.com/fawohlsc/azure-policy-testing/workflows/test-policies/badge.svg)
 
 # Testing Azure Policy
 

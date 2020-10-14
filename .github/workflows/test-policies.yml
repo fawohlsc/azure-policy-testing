@@ -14,7 +14,7 @@ on:
         required: false
         default: 'Testing Azure Policies...'
 jobs:
-  apply-azure-policy:
+  test-policies:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository

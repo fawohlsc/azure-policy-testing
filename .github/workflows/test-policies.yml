@@ -44,7 +44,6 @@ jobs:
         creds: ${{secrets.AZURE_CREDENTIALS}}
         enable-AzPSSession: true 
     - name: Create or update Azure Policies
-      if: "false"
       uses: azure/manage-azure-policy@tauhid621/remedationSupport
       with:
         paths: policies/**

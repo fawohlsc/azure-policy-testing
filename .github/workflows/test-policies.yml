@@ -78,5 +78,7 @@ jobs:
         enable-AzPSSession: true 
     - name: Test Azure Policies
       shell: pwsh
+      env:
+        AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
       run: |
         Invoke-Pester -Output Detailed -CI

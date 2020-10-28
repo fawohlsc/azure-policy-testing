@@ -24,12 +24,12 @@ jobs:
       uses: actions/cache@v2
       with:
         path: /home/runner/.local/share/powershell/Modules/
-        key: ${{runner.os}}-psmodules-${{hashFiles('./.github/workflows/psmodules.json')}}
+        key: ${{runner.os}}-psmodules-${{hashFiles('./psmodules.json')}}
     - name: Install PowerShell modules
       if: steps.cache-psmodules.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
-        Get-Content -Path ./.github/workflows/psmodules.json | ConvertFrom-Json | ForEach-Object {
+        Get-Content -Path ./psmodules.json | ConvertFrom-Json | ForEach-Object {
           Install-Module -Name $_.Name -RequiredVersion $_.RequiredVersion -Force -Scope CurrentUser -ErrorAction Stop  
         }
     - name: Replace tokens

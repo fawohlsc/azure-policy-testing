@@ -43,7 +43,7 @@ function Complete-PolicyRemediation {
     $remediation = $job | Wait-Job | Receive-Job
     
     # When remediation is not successful
-    if ($remediation.ProvisioningState -ne "Succeeded") {
+    if (($remediation.ProvisioningState -ne "Succeeded") -or ($remediation.DeploymentSummary.TotalDeployments -eq 0)) {
         throw "Policy '$($PolicyName)' could not remediate resource group '$($ResourceGroup.ResourceGroupName)'."
     }
 }

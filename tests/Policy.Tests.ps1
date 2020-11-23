@@ -2,6 +2,10 @@ Import-Module "$($($PSScriptRoot))/Policy.Utils.psm1" -Force
 
 Describe "Testing Azure Policies" {
     BeforeEach {
+        # Suppress unused variable warning caused by Pester scoping.
+        # See also: https://pester.dev/docs/usage/setup-and-teardown#scoping
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        
         # Create a dedicated resource group for each test case
         $ResourceGroup = New-AzResourceGroup -Name (New-Guid).Guid -Location "northeurope"
     }

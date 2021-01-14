@@ -4,79 +4,60 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/**'
-      - 'policies/**'
-      - 'tests/**'
+      - ".github/workflows/**"
+      - "policies/**"
+      - "tests/**"
   workflow_dispatch:
     inputs:
       remarks:
-        description: 'Reason for triggering the workflow run'
+        description: "Reason for triggering the workflow run"
         required: false
-        default: 'Testing Azure Policies...'
+        default: "Testing Azure Policies..."
 jobs:
   test-policies:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Cache PowerShell modules
-      id: cache-psmodules
-      uses: actions/cache@v2
-      with:
-        path: /home/runner/.local/share/powershell/Modules/
-        key: ${{runner.os}}-psmodules-${{hashFiles('./psmodules.json')}}
-    - name: Install PowerShell modules
-      if: steps.cache-psmodules.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: |
-        Get-Content -Path ./psmodules.json | ConvertFrom-Json | ForEach-Object {
-          Install-Module -Name $_.Name -RequiredVersion $_.RequiredVersion -Force -Scope CurrentUser -ErrorAction Stop  
-        }
-    - name: Replace tokens
-      uses: cschleiden/replace-tokens@v1
-      with:
-        files: '["**/*.json"]'
-      env:
-        AZURE_SUBSCRIPTION_ID: ${{secrets.AZURE_SUBSCRIPTION_ID}}
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{secrets.AZURE_CREDENTIALS}}
-        enable-AzPSSession: true 
-    - name: Create or update Azure Policies
-      uses: azure/manage-azure-policy@v0
-      with:
-        paths: policies/**
-        assignments: assign.test.json  
-    # Workaround for https://github.com/Azure/manage-azure-policy/issues/23
-    - name: Fix Azure Policy Assignment
-      shell: pwsh
-      run: |
-        # Busy waiting would be better, but just waiting a few seconds is ok for a workaround
-        $wait = 60
-        Write-Host "Waiting $($wait)s to complete creation of policy assignment and managed identity..."
-        Start-Sleep -Seconds $wait
-
-        # Assign required role to managed identity used for policy remediation
-        $objectId = (Get-AzPolicyAssignment 
-            | Where-Object { $_.Properties.DisplayName -eq "Deploy-Route-NextHopVirtualAppliance" }
-        ).Identity.principalId
-        $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
-        New-AzRoleAssignment `
-            -ObjectId $objectId `
-            -RoleDefinitionName "Network Contributor" `
-            -Scope $scope `
-            -ErrorAction SilentlyContinue # Suppressing already existing role assignment
-    # Logout/Login to Azure to ensure that the latest policies are applied
-    - name: Logout of Azure
-      shell: pwsh
-      run: Disconnect-AzAccount
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{secrets.AZURE_CREDENTIALS}}
-        enable-AzPSSession: true 
-    - name: Test Azure Policies
-      shell: pwsh
-      run: |
-        Invoke-Pester -Output Detailed -CI
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Cache PowerShell modules
+        id: cache-psmodules
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.local/share/powershell/Modules/
+          key: ${{runner.os}}-psmodules-${{hashFiles('./psmodules.json')}}
+      - name: Install PowerShell modules
+        if: steps.cache-psmodules.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Get-Content -Path ./psmodules.json | ConvertFrom-Json | ForEach-Object {
+            Install-Module -Name $_.Name -RequiredVersion $_.RequiredVersion -Force -Scope CurrentUser -ErrorAction Stop  
+          }
+      - name: Replace tokens
+        uses: cschleiden/replace-tokens@v1
+        with:
+          files: '["**/*.json"]'
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{secrets.AZURE_SUBSCRIPTION_ID}}
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{secrets.AZURE_CREDENTIALS}}
+          enable-AzPSSession: true
+      - name: Create or update Azure Policies
+        uses: azure/manage-azure-policy@v0
+        with:
+          paths: policies/**
+          assignments: assign.test.json
+      # Logout/Login to Azure to ensure that the latest policies are applied
+      - name: Logout of Azure
+        shell: pwsh
+        run: Disconnect-AzAccount
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{secrets.AZURE_CREDENTIALS}}
+          enable-AzPSSession: true
+      - name: Test Azure Policies
+        shell: pwsh
+        run: |
+          Invoke-Pester -Output Detailed -CI

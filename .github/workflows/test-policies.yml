@@ -48,26 +48,6 @@ jobs:
         with:
           paths: policies/**
           assignments: assign.test.json
-      # Workaround for https://github.com/Azure/manage-azure-policy/issues/23
-      - name: Fix Azure Policy Assignment
-        if: false
-        shell: pwsh
-        run: |
-          # Busy waiting would be better, but just waiting a few seconds is ok for a workaround
-          $wait = 60
-          Write-Host "Waiting $($wait)s to complete creation of policy assignment and managed identity..."
-          Start-Sleep -Seconds $wait
-
-          # Assign required role to managed identity used for policy remediation
-          $objectId = (Get-AzPolicyAssignment 
-              | Where-Object { $_.Properties.DisplayName -eq "Deploy-Route-NextHopVirtualAppliance" }
-          ).Identity.principalId
-          $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
-          New-AzRoleAssignment `
-              -ObjectId $objectId `
-              -RoleDefinitionName "Network Contributor" `
-              -Scope $scope `
-              -ErrorAction SilentlyContinue # Suppressing already existing role assignment
       # Logout/Login to Azure to ensure that the latest policies are applied
       - name: Logout of Azure
         shell: pwsh

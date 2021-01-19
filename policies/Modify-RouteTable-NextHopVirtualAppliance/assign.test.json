@@ -4,8 +4,8 @@
         "tier": "Free"
     },
     "properties": {
-        "displayName": "Append-Route-NextHopVirtualAppliance",
-        "policyDefinitionId": "/subscriptions/#{AZURE_SUBSCRIPTION_ID}#/providers/Microsoft.Authorization/policyDefinitions/e40e326a-2592-4a41-a3f6-d9621b2eac0d",
+        "displayName": "Modify-RouteTable-NextHopVirtualAppliance",
+        "policyDefinitionId": "/subscriptions/#{AZURE_SUBSCRIPTION_ID}#/providers/Microsoft.Authorization/policyDefinitions/9c41d7d0-4243-4e15-845a-80081f125302",
         "scope": "/subscriptions/#{AZURE_SUBSCRIPTION_ID}#",
         "notScopes": [],
         "parameters": {
@@ -25,7 +25,13 @@
         },
         "enforcementMode": "Default"
     },
-    "id": "/subscriptions/#{AZURE_SUBSCRIPTION_ID}#/providers/Microsoft.Authorization/policyAssignments/183522334d244074a746bac6",
+    "identity": {
+        "principalId": "81edbefa-fe65-489f-acd5-2a8b321f6d72",
+        "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+        "type": "SystemAssigned"
+    },
+    "id": "/subscriptions/#{AZURE_SUBSCRIPTION_ID}#/providers/Microsoft.Authorization/policyAssignments/01fa99f6f94240669baf7c7d",
     "type": "Microsoft.Authorization/policyAssignments",
-    "name": "183522334d244074a746bac6"
+    "name": "01fa99f6f94240669baf7c7d",
+    "location": "northeurope"
 }

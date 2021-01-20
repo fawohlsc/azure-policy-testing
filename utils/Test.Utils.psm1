@@ -224,23 +224,6 @@ function Get-ResourceLocationDefault {
 
 <#
 .SYNOPSIS
-Initializes the automated tests targeting Azure.
-
-.DESCRIPTION
-Initializes the automated tests targeting Azure, i.e.
-- Set Azure tenant & subscription
-- Suppress Azure PowerShell's breaking changes warnings 
-
-.EXAMPLE
-Initialize-AzTest
-#>
-function Initialize-AzTest {
-    # Reduces noise in test results
-    Set-Item Env:\SuppressAzurePowerShellBreakingChangeWarnings "true"
-}
-
-<#
-.SYNOPSIS
 Create a dedicated resource group for an automated test case.
 
 .DESCRIPTION
@@ -261,6 +244,7 @@ function New-ResourceGroupTest {
         [ValidateNotNullOrEmpty()]
         [string]$Location = (Get-ResourceLocationDefault)
     )
-
-    New-AzResourceGroup -Name (New-Guid).Guid -Location $Location
+    
+    $resourceGroup = New-AzResourceGroup -Name (New-Guid).Guid -Location $Location
+    return $resourceGroup
 }

@@ -3,6 +3,7 @@
         "displayName": "Audit-Route-NextHopVirtualAppliance",
         "policyType": "Custom",
         "mode": "All",
+        "description": "Audit route tables for route with address prefix 0.0.0.0/0 pointing to the virtual appliance.",
         "metadata": {
             "category": "Network"
         },

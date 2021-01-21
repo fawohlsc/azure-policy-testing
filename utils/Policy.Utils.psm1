@@ -85,7 +85,7 @@ function Complete-PolicyRemediation {
         [ushort]$MaxRetries = 3
     )
     
-    # Determine policy assignment
+    # Determine policy assignment id
     $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
     $policyAssignmentId = (Get-AzPolicyAssignment -Scope $scope
         | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
@@ -188,13 +188,18 @@ function Get-PolicyComplianceState {
         [ushort]$MaxRetries = 30
     )
 
+    # Determine policy definition name
+    $policyDefinitionName = (Get-AzPolicyDefinition 
+        | Where-Object { $_.Properties.DisplayName -eq $PolicyDefinition }
+    ).Name
+
     # Policy compliance scan might be completed, but poliy compliance state might still be null due to race conditions.
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
     do {
-        $isCompliant = (
-            Get-AzPolicyState -ResourceId $Resource.Id  
-            | Where-Object { $_.PolicyDefinitionId -match $PolicyDefinition }
+        $isCompliant = (Get-AzPolicyState `
+                -PolicyDefinitionName $policyDefinitionName `
+                -Filter "ResourceId eq '$($Resource.Id)'" `
         ).IsCompliant
         
         # Success: Policy compliance state is not null.

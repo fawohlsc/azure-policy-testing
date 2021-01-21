@@ -239,7 +239,7 @@ function Test-RouteNextHopVirtualAppliance {
         [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable
     )
     
-    $route = $RouteTable | Get-RouteNextHopVirtualAppliance 
+    $route = Get-RouteNextHopVirtualAppliance -RouteTable $RouteTable
 
     return $null -ne $route
 }

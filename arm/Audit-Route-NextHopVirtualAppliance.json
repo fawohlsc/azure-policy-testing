@@ -81,9 +81,9 @@
                         "value": "[parameters('routeTableSettings')]"
                     }
                 },
-                "description": "Denies incompliant Redis firewall rules.",
+                "description": "Audit route tables for route with address prefix 0.0.0.0/0 pointing to the virtual appliance.",
                 "metadata": {
-                    "category": "Cache"
+                    "category": "Network"
                 },
                 "enforcementMode": "Default"
             },

@@ -115,7 +115,7 @@
                 },
                 "description": "Denies incompliant Redis firewall rules.",
                 "metadata": {
-                    "category": "Cache"
+                    "category": "Network"
                 },
                 "enforcementMode": "Default"
             },

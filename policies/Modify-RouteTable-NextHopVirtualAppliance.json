@@ -1,22 +1,29 @@
 {
     "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
-    "parameters": {
-        "routeTableSettings": {
-            "type": "Object",
-            "metadata": {
-                "displayName": "Route Table Settings",
-                "description": "Location-specific settings for route tables."
-            }
-        }
-    },
     "variables": {
         "policyName": "Modify-RouteTable-NextHopVirtualAppliance",
         "policyDescription": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
         "policyCategory": "Network",
         // Built-in role 'Network Contributor'.
         "policyRoleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7",
-        "policyAssignmentName": "[uniqueString(variables('policyName'))]"
+        "policyAssignmentName": "[uniqueString(variables('policyName'))]",
+        "policyAssignmentLocation": "northeurope",
+        "policyAssignmentParameters": {
+            "routeTableSettings": {
+                "value": {
+                    "northeurope": {
+                        "virtualApplianceIpAddress": "10.0.0.23"
+                    },
+                    "westeurope": {
+                        "virtualApplianceIpAddress": "10.1.0.23"
+                    },
+                    "disabled": {
+                        "virtualApplianceIpAddress": ""
+                    }
+                }
+            }
+        }
     },
     "resources": [
         {
@@ -92,18 +99,14 @@
             "properties": {
                 "displayName": "[variables('policyName')]",
                 "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
-                "parameters": {
-                    "routeTableSettings": {
-                        "value": "[parameters('routeTableSettings')]"
-                    }
-                },
+                "parameters": "[variables('policyAssignmentParameters')]",
                 "description": "[variables('policyDescription')]",
                 "metadata": {
                     "category": "[variables('policyCategory')]"
                 },
                 "enforcementMode": "Default"
             },
-            "location": "northeurope",
+            "location": "[variables('policyAssignmentLocation')]",
             "identity": {
                 "type": "SystemAssigned"
             },

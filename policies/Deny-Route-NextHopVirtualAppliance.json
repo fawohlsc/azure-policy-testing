@@ -1,20 +1,25 @@
 {
     "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
-    "parameters": {
-        "routeTableSettings": {
-            "type": "Object",
-            "metadata": {
-                "displayName": "Route Table Settings",
-                "description": "Location-specific settings for route tables."
-            }
-        }
-    },
     "variables": {
         "policyName": "Deny-Route-NextHopVirtualAppliance",
         "policyDescription": "Deny route with address prefix 0.0.0.0/0 not pointing to the virtual appliance. Both creating routes as a standalone resource or nested within their parent resource route table are considered.",
         "policyCategory": "Network",
-        "virtualApplianceIpAddress": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+        "policyAssignmentParameters": {
+            "routeTableSettings": {
+                "value": {
+                    "northeurope": {
+                        "virtualApplianceIpAddress": "10.0.0.23"
+                    },
+                    "westeurope": {
+                        "virtualApplianceIpAddress": "10.1.0.23"
+                    },
+                    "disabled": {
+                        "virtualApplianceIpAddress": ""
+                    }
+                }
+            }
+        }
     },
     "resources": [
         {
@@ -64,7 +69,7 @@
                                                             },
                                                             {
                                                                 "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
-                                                                "notEquals": "[variables('virtualApplianceIpAddress')]"
+                                                                "notEquals": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
                                                             }
                                                         ]
                                                     }
@@ -93,7 +98,7 @@
                                             },
                                             {
                                                 "field": "Microsoft.Network/routeTables/routes/nextHopIpAddress",
-                                                "notEquals": "[variables('virtualApplianceIpAddress')]"
+                                                "notEquals": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
                                             }
                                         ]
                                     }
@@ -114,11 +119,7 @@
             "properties": {
                 "displayName": "[variables('policyName')]",
                 "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
-                "parameters": {
-                    "routeTableSettings": {
-                        "value": "[parameters('routeTableSettings')]"
-                    }
-                },
+                "parameters": "[variables('policyAssignmentParameters')]",
                 "description": "[variables('policyDescription')]",
                 "metadata": {
                     "category": "[variables('policyCategory')]"

@@ -19,35 +19,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      - name: Cache PowerShell modules
-        id: cache-psmodules
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/.local/share/powershell/Modules/
-          key: ${{runner.os}}-psmodules-${{hashFiles('./psmodules.json')}}
       - name: Install PowerShell modules
-        if: steps.cache-psmodules.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          Get-Content -Path ./psmodules.json | ConvertFrom-Json | ForEach-Object {
-            Install-Module -Name $_.Name -RequiredVersion $_.RequiredVersion -Force -Scope CurrentUser -ErrorAction Stop  
-          }
-      - name: Replace tokens
-        uses: cschleiden/replace-tokens@v1
-        with:
-          files: '["**/*.json"]'
-        env:
-          AZURE_SUBSCRIPTION_ID: ${{secrets.AZURE_SUBSCRIPTION_ID}}
+          Install-Module -Name 'Az' -RequiredVersion '4.7.0' -Force -Scope CurrentUser -ErrorAction Stop
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{secrets.AZURE_CREDENTIALS}}
           enable-AzPSSession: true
       - name: Create or update Azure Policies
-        uses: azure/manage-azure-policy@v0
-        with:
-          paths: policies/**
-          assignments: assign.test.json
+        shell: pwsh
+        run: |
+          Select-AzSubscription -SubscriptionId '$(AZURE_SUBSCRIPTION_ID)'
+
+          Get-ChildItem -Path './policies' | ForEach-Object {
+            New-AzDeployment -Location 'northeurope' -TemplateFile $_.FullName
+          }
       # Logout/Login to Azure to ensure that the latest policies are applied
       - name: Logout of Azure
         shell: pwsh
@@ -60,4 +48,4 @@ jobs:
       - name: Test Azure Policies
         shell: pwsh
         run: |
-          Invoke-Pester -Output Detailed -CI
+          Invoke-Pester -Path './policies' -Output Detailed -CI

@@ -1,19 +1,25 @@
 {
     "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
-    "parameters": {
-        "routeTableSettings": {
-            "type": "Object",
-            "metadata": {
-                "displayName": "Route Table Settings",
-                "description": "Location-specific settings for route tables."
-            }
-        }
-    },
     "variables": {
         "policyName": "Audit-Route-NextHopVirtualAppliance",
         "policyDescription": "Audit route tables for route with address prefix 0.0.0.0/0 pointing to the virtual appliance.",
-        "policyCategory": "Network"
+        "policyCategory": "Network",
+        "policyAssignmentParameters": {
+            "routeTableSettings": {
+                "value": {
+                    "northeurope": {
+                        "virtualApplianceIpAddress": "10.0.0.23"
+                    },
+                    "westeurope": {
+                        "virtualApplianceIpAddress": "10.1.0.23"
+                    },
+                    "disabled": {
+                        "virtualApplianceIpAddress": ""
+                    }
+                }
+            }
+        }
     },
     "resources": [
         {
@@ -81,11 +87,7 @@
             "properties": {
                 "displayName": "[variables('policyName')]",
                 "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
-                "parameters": {
-                    "routeTableSettings": {
-                        "value": "[parameters('routeTableSettings')]"
-                    }
-                },
+                "parameters": "[variables('policyAssignmentParameters')]",
                 "description": "[variables('policyDescription')]",
                 "metadata": {
                     "category": "[variables('policyCategory')]"

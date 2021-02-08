@@ -31,8 +31,6 @@ jobs:
       - name: Create or update Azure Policies
         shell: pwsh
         run: |
-          #Select-AzSubscription -SubscriptionId '$(AZURE_SUBSCRIPTION_ID)'
-
           Get-ChildItem -Path './policies' | ForEach-Object {
             New-AzDeployment -Location 'northeurope' -TemplateFile $_.FullName
           }
@@ -48,4 +46,4 @@ jobs:
       - name: Test Azure Policies
         shell: pwsh
         run: |
-          Invoke-Pester -Path './policies' -Output Detailed -CI
+          Invoke-Pester -Output Detailed -CI

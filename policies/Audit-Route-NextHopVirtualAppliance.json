@@ -10,18 +10,23 @@
             }
         }
     },
+    "variables": {
+        "policyName": "Audit-Route-NextHopVirtualAppliance",
+        "policyDescription": "Audit route tables for route with address prefix 0.0.0.0/0 pointing to the virtual appliance.",
+        "policyCategory": "Network"
+    },
     "resources": [
         {
-            "name": "Audit-Route-NextHopVirtualAppliance",
+            "name": "[variables('policyName')]",
             "type": "Microsoft.Authorization/policyDefinitions",
             "apiVersion": "2020-03-01",
             "properties": {
                 "policyType": "Custom",
                 "mode": "All",
-                "displayName": "Audit-Route-NextHopVirtualAppliance",
-                "description": "Audit route tables for route with address prefix 0.0.0.0/0 pointing to the virtual appliance.",
+                "displayName": "[variables('policyName')]",
+                "description": "[variables('policyDescription')]",
                 "metadata": {
-                    "category": "Network"
+                    "category": "[variables('policyCategory')]"
                 },
                 "parameters": {
                     "routeTableSettings": {
@@ -70,25 +75,25 @@
             }
         },
         {
-            "name": "[uniqueString('Audit-Route-NextHopVirtualAppliance')]",
+            "name": "[uniqueString(variables('policyName'))]",
             "type": "Microsoft.Authorization/policyAssignments",
             "apiVersion": "2020-03-01",
             "properties": {
-                "displayName": "Audit-Route-NextHopVirtualAppliance",
-                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', 'Audit-Route-NextHopVirtualAppliance')]",
+                "displayName": "[variables('policyName')]",
+                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
                 "parameters": {
                     "routeTableSettings": {
                         "value": "[parameters('routeTableSettings')]"
                     }
                 },
-                "description": "Audit route tables for route with address prefix 0.0.0.0/0 pointing to the virtual appliance.",
+                "description": "[variables('policyDescription')]",
                 "metadata": {
-                    "category": "Network"
+                    "category": "[variables('policyCategory')]"
                 },
                 "enforcementMode": "Default"
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyDefinitions', 'Audit-Route-NextHopVirtualAppliance')]"
+                "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]"
             ]
         }
     ]

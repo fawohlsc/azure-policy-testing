@@ -10,18 +10,24 @@
             }
         }
     },
+    "variables": {
+        "policyName": "Deny-Route-NextHopVirtualAppliance",
+        "policyDescription": "Deny route with address prefix 0.0.0.0/0 not pointing to the virtual appliance. Both creating routes as a standalone resource or nested within their parent resource route table are considered.",
+        "policyCategory": "Network",
+        "virtualApplianceIpAddress": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+    },
     "resources": [
         {
-            "name": "Deny-Route-NextHopVirtualAppliance",
+            "name": "[variables('policyName')]",
             "type": "Microsoft.Authorization/policyDefinitions",
             "apiVersion": "2020-03-01",
             "properties": {
                 "policyType": "Custom",
                 "mode": "All",
-                "displayName": "Deny-Route-NextHopVirtualAppliance",
-                "description": "Deny route with address prefix 0.0.0.0/0 not pointing to the virtual appliance. Both creating routes as a standalone resource or nested within their parent resource route table are considered.",
+                "displayName": "[variables('policyName')]",
+                "description": "[variables('policyDescription')]",
                 "metadata": {
-                    "category": "Network"
+                    "category": "[variables('policyCategory')]"
                 },
                 "parameters": {
                     "routeTableSettings": {
@@ -58,7 +64,7 @@
                                                             },
                                                             {
                                                                 "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
-                                                                "notEquals": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                                                                "notEquals": "[variables('virtualApplianceIpAddress')]"
                                                             }
                                                         ]
                                                     }
@@ -87,7 +93,7 @@
                                             },
                                             {
                                                 "field": "Microsoft.Network/routeTables/routes/nextHopIpAddress",
-                                                "notEquals": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                                                "notEquals": "[variables('virtualApplianceIpAddress')]"
                                             }
                                         ]
                                     }
@@ -102,25 +108,25 @@
             }
         },
         {
-            "name": "[uniqueString('Deny-Route-NextHopVirtualAppliance')]",
+            "name": "[uniqueString(variables('policyName'))]",
             "type": "Microsoft.Authorization/policyAssignments",
             "apiVersion": "2020-03-01",
             "properties": {
-                "displayName": "Deny-Route-NextHopVirtualAppliance",
-                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', 'Deny-Route-NextHopVirtualAppliance')]",
+                "displayName": "[variables('policyName')]",
+                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
                 "parameters": {
                     "routeTableSettings": {
                         "value": "[parameters('routeTableSettings')]"
                     }
                 },
-                "description": "Denies incompliant Redis firewall rules.",
+                "description": "[variables('policyDescription')]",
                 "metadata": {
-                    "category": "Network"
+                    "category": "[variables('policyCategory')]"
                 },
                 "enforcementMode": "Default"
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyDefinitions', 'Deny-Route-NextHopVirtualAppliance')]"
+                "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]"
             ]
         }
     ]

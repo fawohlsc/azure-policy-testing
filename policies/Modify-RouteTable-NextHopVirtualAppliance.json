@@ -11,21 +11,25 @@
         }
     },
     "variables": {
+        "policyName": "Modify-RouteTable-NextHopVirtualAppliance",
+        "policyDescription": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
+        "policyCategory": "Network",
         // Built-in role 'Network Contributor'.
-        "roleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
+        "policyRoleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7",
+        "policyAssignmentName": "[uniqueString(variables('policyName'))]"
     },
     "resources": [
         {
-            "name": "Modify-RouteTable-NextHopVirtualAppliance",
+            "name": "[variables('policyName')]",
             "type": "Microsoft.Authorization/policyDefinitions",
             "apiVersion": "2020-03-01",
             "properties": {
                 "policyType": "Custom",
                 "mode": "All",
-                "displayName": "Modify-RouteTable-NextHopVirtualAppliance",
-                "description": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
+                "displayName": "[variables('policyName')]",
+                "description": "[variables('policyDescription')]",
                 "metadata": {
-                    "category": "Network"
+                    "category": "[variables('policyCategory')]"
                 },
                 "parameters": {
                     "routeTableSettings": {
@@ -59,7 +63,7 @@
                         "effect": "modify",
                         "details": {
                             "roleDefinitionIds": [
-                                "[variables('roleDefinitionId')]"
+                                "[variables('policyRoleDefinitionId')]"
                             ],
                             "conflictEffect": "audit",
                             "operations": [
@@ -82,20 +86,20 @@
             }
         },
         {
-            "name": "[uniqueString('Modify-RouteTable-NextHopVirtualAppliance')]",
+            "name": "[variables('policyAssignmentName')]",
             "type": "Microsoft.Authorization/policyAssignments",
             "apiVersion": "2020-03-01",
             "properties": {
-                "displayName": "Modify-RouteTable-NextHopVirtualAppliance",
-                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', 'Modify-RouteTable-NextHopVirtualAppliance')]",
+                "displayName": "[variables('policyName')]",
+                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
                 "parameters": {
                     "routeTableSettings": {
                         "value": "[parameters('routeTableSettings')]"
                     }
                 },
-                "description": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
+                "description": "[variables('policyDescription')]",
                 "metadata": {
-                    "category": "Network"
+                    "category": "[variables('policyCategory')]"
                 },
                 "enforcementMode": "Default"
             },
@@ -104,21 +108,21 @@
                 "type": "SystemAssigned"
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyDefinitions', 'Modify-RouteTable-NextHopVirtualAppliance')]"
+                "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]"
             ]
         },
         {
-            "name": "[guid('Modify-RouteTable-NextHopVirtualAppliance')]",
+            "name": "[guid(variables('policyAssignmentName'))]",
             "type": "Microsoft.Authorization/roleAssignments",
             "apiVersion": "2020-04-01-preview",
             "properties": {
                 "principalType": "ServicePrincipal",
-                "roleDefinitionId": "[variables('roleDefinitionId')]",
-                // Get the identifier of the managed identity created for policy assignment 'Modify-RouteTable-NextHopVirtualAppliance'.
-                "principalId": "[reference(uniqueString('Modify-RouteTable-NextHopVirtualAppliance'), '2020-03-01', 'Full').identity.principalId]"
+                "roleDefinitionId": "[variables('policyRoleDefinitionId')]",
+                // Get the identifier of the managed identity created for the policy assignment.
+                "principalId": "[reference(variables('policyAssignmentName'), '2020-03-01', 'Full').identity.principalId]"
             },
             "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyAssignments', uniqueString('Modify-RouteTable-NextHopVirtualAppliance'))]"
+                "[resourceId('Microsoft.Authorization/policyAssignments', variables('policyAssignmentName'))]"
             ]
         }
     ]

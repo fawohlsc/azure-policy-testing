@@ -31,7 +31,7 @@ jobs:
       - name: Create or update Azure Policies
         shell: pwsh
         run: |
-          Select-AzSubscription -SubscriptionId '$(AZURE_SUBSCRIPTION_ID)'
+          #Select-AzSubscription -SubscriptionId '$(AZURE_SUBSCRIPTION_ID)'
 
           Get-ChildItem -Path './policies' | ForEach-Object {
             New-AzDeployment -Location 'northeurope' -TemplateFile $_.FullName

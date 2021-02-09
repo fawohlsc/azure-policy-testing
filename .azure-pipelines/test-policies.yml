@@ -18,40 +18,10 @@ pool:
   vmImage: "windows-latest"
 
 steps:
-  - displayName: Checkout repository
-    checkout: self
-  - displayName: Install PowerShell modules
-    workingDirectory: $(Build.SourcesDirectory)
-    pwsh: |
+  - checkout: self
+    displayName: Checkout repository
+  - pwsh: |
       Install-Module -Name 'Az' -RequiredVersion '4.7.0' -Force -Scope CurrentUser -ErrorAction Stop
-  - displayName: Login to Azure
-    env:
-      AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
-    pwsh: |
-      $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
-      $credential =  New-Object System.Management.Automation.PSCredential("$(AZURE_SUBSCRIPTION_CLIENT_ID)", $password)
-      Connect-AzAccount -Subscription "$(AZURE_SUBSCRIPTION_ID)" -Tenant "$(AZURE_SUBSCRIPTION_TENANT_ID)" -ServicePrincipal -Credential $credential -Scope CurrentUser
-  - displayName: Create or update Azure Policies
     workingDirectory: $(Build.SourcesDirectory)
-    pwsh: |
-      Get-ChildItem -Path './policies' | ForEach-Object {
-        New-AzDeployment -Location 'northeurope' -TemplateFile $_.FullName
-      }
-  # Logout/Login to Azure to ensure that the latest policies are applied
-  - displayName: Logout of Azure
-    pwsh: |
-      Disconnect-AzAccount
-  - displayName: Login to Azure
-    env:
-      AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
-    pwsh: |
-      $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
-      $credential =  New-Object System.Management.Automation.PSCredential("$(AZURE_SUBSCRIPTION_CLIENT_ID)", $password)
-      Connect-AzAccount -Subscription "$(AZURE_SUBSCRIPTION_ID)" -Tenant "$(AZURE_SUBSCRIPTION_TENANT_ID)" -ServicePrincipal -Credential $credential -Scope CurrentUser
-  - displayName: Test Azure Policies
-    pwsh: |
-      Invoke-Pester -Output Detailed -CI
-  - displayName: Clean up cached Azure credentials
-    condition: always()
-    pwsh: |
-      Clear-AzContext -Scope CurrentUser -Force -ErrorAction SilentlyContinue | Out-Null
+    displayName: Install PowerShell modules
+    

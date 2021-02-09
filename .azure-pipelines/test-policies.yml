@@ -15,18 +15,44 @@ trigger:
       - "tests/**"
 
 pool:
-  vmImage: "windows-latest"
+  vmImage: ubuntu-latest
 
 steps:
   - checkout: self
     displayName: Checkout repository
   - pwsh: |
+      Install-Module -Name 'Az' -RequiredVersion '4.7.0' -Force -Scope CurrentUser -ErrorAction Stop
+      Import-Module -Name 'Az' -RequiredVersion '4.7.0' -Force
+    displayName: Install and import PowerShell modules
+    workingDirectory: $(Build.SourcesDirectory)
+  - pwsh: |
       $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
       $credential =  New-Object System.Management.Automation.PSCredential("$(AZURE_SUBSCRIPTION_CLIENT_ID)", $password)
       Connect-AzAccount -Subscription "$(AZURE_SUBSCRIPTION_ID)" -Tenant "$(AZURE_SUBSCRIPTION_TENANT_ID)" -ServicePrincipal -Credential $credential -Scope CurrentUser
-    displayName: Login to Azure
+    displayName: 'Login to Azure'
     env:
-      AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
-    
-  
-    
+     AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
+  - pwsh: |
+      Get-ChildItem -Path './policies' | ForEach-Object {
+        New-AzDeployment -Location 'northeurope' -TemplateFile $_.FullName
+      }
+    displayName: Create or update Azure Policies
+    workingDirectory: $(Build.SourcesDirectory)
+  # Logout/Login to Azure to ensure that the latest policies are applied
+  - pwsh: |
+      Disconnect-AzAccount
+    displayName: Logout of Azure
+  - pwsh: |
+      $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
+      $credential =  New-Object System.Management.Automation.PSCredential("$(AZURE_SUBSCRIPTION_CLIENT_ID)", $password)
+      Connect-AzAccount -Subscription "$(AZURE_SUBSCRIPTION_ID)" -Tenant "$(AZURE_SUBSCRIPTION_TENANT_ID)" -ServicePrincipal -Credential $credential -Scope CurrentUser
+    displayName: 'Login to Azure'
+    env:
+     AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
+  - pwsh: |
+      Invoke-Pester -Output Detailed -CI
+    displayName: Test Azure Policies
+  - pwsh: |
+      Clear-AzContext -Scope CurrentUser -Force -ErrorAction SilentlyContinue | Out-Null
+    displayName: Cleanup cached Azure credentials
+    condition: always()

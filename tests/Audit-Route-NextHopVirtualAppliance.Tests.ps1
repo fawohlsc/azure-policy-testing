@@ -17,8 +17,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                     -AddressPrefix "0.0.0.0/0" `
                     -NextHopType "VirtualAppliance" `
                     -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $ResourceGroup.Location)
-                
-                
+                                
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
                     -ResourceGroupName $ResourceGroup.ResourceGroupName `

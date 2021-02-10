@@ -1,153 +1,58 @@
 parameters:
-- name: Reason
-  displayName: 'Reason for triggering the pipeline run'
-  type: string
-  default: 'Testing Azure Policies...'
+  - name: "Reason"
+    displayName: "Reason for triggering the pipeline run"
+    type: string
+    default: "Testing Azure Policies..."
 
 trigger:
   branches:
     include:
-    - main
+      - main
   paths:
     include:
-    - '.github/workflows/**'
-    - 'policies/**'
-    - 'tests/**' 
+      - ".github/workflows/**"
+      - "policies/**"
+      - "tests/**"
 
 pool:
-  vmImage: 'windows-latest' #'ubuntu-latest'
+  vmImage: ubuntu-latest
 
 steps:
   - checkout: self
-    displayName: 'Checkout repository'
-  - pwsh: |  
-      $psmodules = Get-FileHash -Path './psmodules.json' -Algorithm SHA256
-      Write-Host "##vso[task.setvariable variable=psmodules;IsOutput=true]$($psmodules.Hash)"
-    displayName: 'Hash Files'
-    name: hashfiles
-    workingDirectory: $(Build.SourcesDirectory)
-  - task: Cache@2
-    displayName: 'Cache PowerShell modules'
-    name: cache_psmodules
-    inputs:      
-      key: psmodules | "$(Agent.OS)" | "$(hashfiles.psmodules)"
-      cacheHitVar: ne(variables.cache_psmodules.cache_hit      
-      ${{ if eq(variables['Agent.OS'], 'Windows_NT') }}:
-        path: $(UserProfile)\Documents\PowerShell\Modules
-      ${{ if ne(variables['Agent.OS'], 'Windows_NT') }}:
-        path: $(UserProfile)/.local/share/powershell/Modules/
+    displayName: "Checkout repository"
   - pwsh: |
-      # Install the required PS Modules
-      Get-Content -Path ./psmodules.json | ConvertFrom-Json | ForEach-Object {
-        $FullyQualifedName = @{ModuleName=$_.Name;ModuleVersion=$_.RequiredVersion}
-        if (-not (Get-Module -FullyQualifiedName $FullyQualifedName)) {
-          Install-Module -Name $_.Name -RequiredVersion $_.RequiredVersion -Force -Scope CurrentUser -ErrorAction Stop -AllowClobber
-        }
-      }
-    displayName: 'Install PowerShell modules'
-    workingDirectory: $(Build.SourcesDirectory)
-    condition: and(succeeded(), ne(variables.cache_psmodules.cache_hit, true))
-  - pwsh: |
-      # Import the required PS Modules
-      Get-Content -Path ./psmodules.json | ConvertFrom-Json | ForEach-Object {
-        Import-Module -Name $_.Name -RequiredVersion $_.RequiredVersion -Force
-      }
-    displayName: 'Import PowerShell modules'
+      Install-Module -Name "Az" -RequiredVersion "4.7.0" -Force -Scope CurrentUser -ErrorAction Stop
+      Import-Module -Name "Az" -RequiredVersion "4.7.0" -Force
+    displayName: "Install and import PowerShell modules"
     workingDirectory: $(Build.SourcesDirectory)
   - pwsh: |
-      Get-ChildItem -Recurse -Filter *.json | ForEach-Object {
-        ((Get-Content -path $_.FullName -Raw) -replace '#{AZURE_SUBSCRIPTION_ID}#','$(AZURE_SUBSCRIPTION_ID)') | Set-Content -Path $_.FullName
-      }
-    displayName: 'Replace tokens'
-    workingDirectory: $(Build.SourcesDirectory)/policies/
-  - pwsh: |
-      # Login to Azure
       $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
-      $credential =  New-Object System.Management.Automation.PSCredential("$(AZURE_SUBSCRIPTION_CLIENT_ID)", $password)
-      Connect-AzAccount -Subscription "$(AZURE_SUBSCRIPTION_ID)" -Tenant "$(AZURE_SUBSCRIPTION_TENANT_ID)" -ServicePrincipal -Credential $credential -Scope CurrentUser
-    displayName: 'Login to Azure'
+      $credential =  New-Object System.Management.Automation.PSCredential($env:AZURE_SUBSCRIPTION_CLIENT_ID, $password)
+      Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser
+    displayName: "Login to Azure"
     env:
-     AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
+      AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
   - pwsh: |
-      # Apply the Role Definitions and Assignments
-      $failed = $false
-      Get-ChildItem -Depth 1 -Directory | ForEach-Object {
-          $definition_file = $_.GetFiles("policy.json") | Select-Object -first 1  -ExpandProperty FullName 
-          $assignment_file = $_.GetFiles("assign.test.json") | Select-Object -first 1 -ExpandProperty FullName
-
-          $definition = Get-Content -Path $definition_file | ConvertFrom-Json
-          $assignment = Get-Content -Path $assignment_file | ConvertFrom-Json
-
-          # Create the Policy Definition
-          Write-Host "Creating policy definition '$($definition.id)'."
-          $created_definition = Invoke-AzRestMethod -Method PUT -Path "$($definition.id)?api-version=2019-09-01" -Payload ($definition | ConvertTo-Json -Depth 99)
-          if($created_definition.StatusCode -eq 201)
-          {
-            Write-Host "Successfully created policy definition '$($definition.id)'."
-            # Create the Policy Assignment
-            Write-Host "Creating policy assignment '$($assignment.id)'."
-            $created_assignment = Invoke-AzRestMethod -Method PUT -Path "$($assignment.id)?api-version=2019-09-01" -Payload ($assignment | ConvertTo-Json -Depth 99)
-            if($created_assignment.StatusCode -eq 201)
-            {
-              Write-Host "Successfully created policy assignment '$($assignment.id)'."
-            }
-            else
-            {
-              Write-Host "Failed to create policy assignment '$($assignment.id)'."
-              Write-Host "##vso[task.debug]$($created_assignment.Content)"
-              $failed = $true
-            }
-          }
-          else
-          {
-            Write-Host "Failed to create policy definition '$($definition.id)'."
-            Write-Host "##vso[task.debug]$($created_definition.Content)"
-            $failed = $true
-          }
+      Get-ChildItem -Path "./policies" | ForEach-Object {
+        New-AzDeployment -Location "northeurope" -TemplateFile $_.FullName
       }
-      if($failed)
-      {
-        Write-Host "##vso[task.complete result=Failed;]Failed to create Policy Definition and/or Assignment."
-      }
-    displayName: 'Create or update Azure Policies'
-    workingDirectory: $(Build.SourcesDirectory)/policies/
-  - pwsh: |   # Workaround for https://github.com/Azure/manage-azure-policy/issues/23
-      # Busy waiting would be better, but just waiting a few seconds is ok for a workaround
-      $wait = 60
-      Write-Host "Waiting $($wait)s to complete creation of policy assignment and managed identity..."
-      Start-Sleep -Seconds $wait
-
-      # Assign required role to managed identity used for policy remediation
-      $objectId = (Get-AzPolicyAssignment 
-          | Where-Object { $_.Properties.DisplayName -eq "Deploy-Route-NextHopVirtualAppliance" }
-      ).Identity.principalId
-      $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
-      New-AzRoleAssignment `
-          -ObjectId $objectId `
-          -RoleDefinitionName "Network Contributor" `
-          -Scope $scope `
-          -ErrorAction SilentlyContinue # Suppressing already existing role assignment
-    displayName: 'Fix Azure Policy Assignment'
+    displayName: "Create or update Azure Policies"
+    workingDirectory: $(Build.SourcesDirectory)
   # Logout/Login to Azure to ensure that the latest policies are applied
   - pwsh: |
-      # Logout from Azure
       Disconnect-AzAccount
-    displayName: 'Logout of Azure'
+    displayName: "Logout of Azure"
   - pwsh: |
-      # Login to Azure
       $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
-      $credential =  New-Object System.Management.Automation.PSCredential("$(AZURE_SUBSCRIPTION_CLIENT_ID)", $password)
-      Connect-AzAccount -Subscription "$(AZURE_SUBSCRIPTION_ID)" -Tenant "$(AZURE_SUBSCRIPTION_TENANT_ID)" -ServicePrincipal -Credential $credential -Scope CurrentUser
-    displayName: 'Login to Azure'
+      $credential =  New-Object System.Management.Automation.PSCredential($env:AZURE_SUBSCRIPTION_CLIENT_ID, $password)
+      Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser
+    displayName: "Login to Azure"
     env:
-     AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
+      AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
   - pwsh: |
-      # Run Pester Tests
       Invoke-Pester -Output Detailed -CI
-    displayName: 'Test Azure Policies'
+    displayName: "Test Azure Policies"
   - pwsh: |
-      # Clear any remaining Azure Credentials
       Clear-AzContext -Scope CurrentUser -Force -ErrorAction SilentlyContinue | Out-Null
-    displayName: 'Cleanup Cached Azure credentials'
+    displayName: "Cleanup cached Azure credentials"
     condition: always()
-

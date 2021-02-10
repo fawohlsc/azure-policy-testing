@@ -32,7 +32,7 @@ function Get-RouteNextHopVirtualAppliance {
         ($_.AddressPrefix -eq "0.0.0.0/0") -and
         ($_.NextHopType -eq "VirtualAppliance") -and
         ($_.NextHopIpAddress -eq $nextHopIpAddress)
-    } | Select-Object -First 1 # Address prefixes are unique within a route table
+    } | Select-Object -First 1 # Address prefixes are unique within a route table.
 
     return $route
 }
@@ -109,11 +109,11 @@ function Invoke-RouteDelete {
 
     # Handling the HTTP status codes returned by the DELETE request for route 
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/delete
-    # Accepted
+    # Accepted.
     if ($httpResponse.StatusCode -eq 200) {
         # All good, do nothing
     }
-    # Accepted and the operation will complete asynchronously
+    # Accepted and the operation will complete asynchronously.
     elseif ($httpResponse.StatusCode -eq 202) {
         # Invoke-AzRestMethod currently does not support awaiting asynchronous operations
         # See also: https://github.com/Azure/azure-powershell/issues/13293
@@ -122,11 +122,11 @@ function Invoke-RouteDelete {
             throw "Asynchronous operation failed with message: '$($asyncOperation)'"
         }
     }
-    # Route was deleted or not found
+    # Route was deleted or not found.
     elseif ($httpResponse.StatusCode -eq 204) {
-        # All good, do nothing
+        # All good, do nothing.
     }
-    # Error response describing why the operation failed
+    # Error response describing why the operation failed.
     else {
         throw "Operation failed with message: '$($httpResponse.Content)'"
     }
@@ -198,22 +198,22 @@ function Invoke-RoutePut {
         -Method "PUT" `
         -Payload $payload
 
-    # Handling the HTTP status codes returned by the PUT request for route 
+    # Handling the HTTP status codes returned by the PUT request for route. 
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate
     # Update successful. The operation returns the resulting Route resource.
     if ($httpResponse.StatusCode -eq 200) {
-        # All good, do nothing
+        # All good, do nothing.
     }
     # Create successful. The operation returns the resulting Route resource.
     elseif ($httpResponse.StatusCode -eq 201) {
-        # Invoke-AzRestMethod currently does not support awaiting asynchronous operations
+        # Invoke-AzRestMethod currently does not support awaiting asynchronous operations.
         # See also: https://github.com/Azure/azure-powershell/issues/13293
         $asyncOperation = $httpResponse | Wait-AsyncOperation
         if ($asyncOperation.Status -ne "Succeeded") {
             throw "Asynchronous operation failed with message: '$($asyncOperation)'"
         }
     }
-    # Error response describing why the operation failed
+    # Error response describing why the operation failed.
     else {
         throw "Operation failed with message: '$($httpResponse.Content)'"
     }

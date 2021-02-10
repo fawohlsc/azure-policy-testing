@@ -85,7 +85,7 @@ function Complete-PolicyRemediation {
         [ushort]$MaxRetries = 3
     )
     
-    # Determine policy assignment id
+    # Determine policy assignment id-
     $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
     $policyAssignmentId = (Get-AzPolicyAssignment -Scope $scope
         | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
@@ -102,7 +102,7 @@ function Complete-PolicyRemediation {
     # When a deployment is expected, it might be required to retry remediation to avoid flaky tests.
     $retries = 0
     do {
-        # Trigger and wait for remediation
+        # Trigger and wait for remediation.
         $job = Start-AzPolicyRemediation `
             -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
             -Scope $Resource.Id `
@@ -111,7 +111,7 @@ function Complete-PolicyRemediation {
             -AsJob
         $remediation = $job | Wait-Job | Receive-Job
         
-        # Check remedation provisioning state and deployment when required 
+        # Check remediation provisioning state and deployment when required .
         $succeeded = $remediation.ProvisioningState -eq "Succeeded"
         if ($succeeded) {
             if ($CheckDeployment) {
@@ -188,7 +188,7 @@ function Get-PolicyComplianceState {
         [ushort]$MaxRetries = 30
     )
 
-    # Policy compliance scan might be completed, but poliy compliance state might still be null due to race conditions.
+    # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
     do {

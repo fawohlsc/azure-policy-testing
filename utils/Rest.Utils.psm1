@@ -40,19 +40,19 @@ function Wait-AsyncOperation {
         [uint32]$MaxRetries = 100
     )
 
-    # Asynchronous operations either return HTTP status code 201 (Created) or 202 (Accepted)
+    # Asynchronous operations either return HTTP status code 201 (Created) or 202 (Accepted).
     # See also: https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/async-operations#status-codes-for-asynchronous-operations
     if ($HttpResponse.StatusCode -notin @(201, 202)) {
         throw "HTTP response status code must be either '201' or '202' to indicate an asynchronous operation."
     }
         
-    # Extracting retry after from HTTP Response Headers
+    # Extracting retry after from HTTP Response Headers.
     # See also: https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/async-operations#url-to-monitor-status
     $retryAfter = $HttpResponse 
     | Get-HttpResponseHeaderValues -HeaderName "Retry-After" 
     | Select-Object -First 1 
 
-    # Extracting status URL from HTTP Response Headers
+    # Extracting status URL from HTTP Response Headers.
     $statusUrl = $HttpResponse 
     | Get-HttpResponseHeaderValues -HeaderName "Azure-AsyncOperation" 
     | Select-Object -First 1 
@@ -67,10 +67,10 @@ function Wait-AsyncOperation {
         throw "HTTP response does not contain any header 'Azure-AsyncOperation' or 'Location' containing the URL to monitor the status of the asynchronous operation."
     }
 
-    # Convert status URL to path
+    # Convert status URL to path.
     $statusPath = $statusUrl.Replace("https://management.azure.com", "")
     
-    # Monitor status of asynchronous operation
+    # Monitor status of asynchronous operation.
     $httpResponse = $null
     $retries = 0
     do {

@@ -19,7 +19,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                     -ResourceGroupName $ResourceGroup.ResourceGroupName `
                     -Location $ResourceGroup.Location
             
-                # Verify that route 0.0.0.0/0 was added by policy
+                # Verify that route 0.0.0.0/0 was added by policy.
                 $routeTable
                 | Test-RouteNextHopVirtualAppliance
                 | Should -BeTrue
@@ -37,17 +37,17 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                     -ResourceGroupName $ResourceGroup.ResourceGroupName `
                     -Location $ResourceGroup.Location
 
-                # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy
+                # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy.
                 $route = Get-RouteNextHopVirtualAppliance -RouteTable $routeTable
 
                 # Remove-AzRouteConfig/Set-AzRouteTable will issue a PUT request for routeTables and hence policy might kick in.
-                # In order to delete the route without policy interferring, directly call the REST API by issuing a DELETE request for route.
+                # In order to delete the route without policy interfering, directly call the REST API by issuing a DELETE request for route.
                 $routeTable | Invoke-RouteDelete -Route $route
             
-                # Remediate route table by policy and wait for completion
+                # Remediate route table by policy and wait for completion.
                 $routeTable | Complete-PolicyRemediation -PolicyDefinitionName "Modify-RouteTable-NextHopVirtualAppliance" -CheckDeployment
             
-                # Verify that route 0.0.0.0/0 was added by policy remediation
+                # Verify that route 0.0.0.0/0 was added by policy remediation.
                 Get-AzRouteTable -ResourceGroupName $routeTable.ResourceGroupName -Name $routeTable.Name
                 | Test-RouteNextHopVirtualAppliance
                 | Should -BeTrue

@@ -23,16 +23,16 @@ function AzCleanUp {
     )
 
     try {
-        # Remember $ErrorActionPreference
+        # Remember $ErrorActionPreference.
         $errorAction = $ErrorActionPreference
 
-        # Stop clean-up on errors, since $ErrorActionPreference defaults to 'Continue' in PowerShell
+        # Stop clean-up on errors, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
         $ErrorActionPreference = "Stop" 
 
-        # Execute clean-up script
+        # Execute clean-up script.
         $CleanUp.Invoke()
 
-        # Reset $ErrorActionPreference to previous value
+        # Reset $ErrorActionPreference to previous value.
         $ErrorActionPreference = $errorAction
     }
     catch {
@@ -88,24 +88,24 @@ function AzRetry {
         try {
             $Retry.Invoke()
 
-            # Exit loop when no exception was thrown  
+            # Exit loop when no exception was thrown.
             break
         }
         catch {
-            # Determine root cause exception
+            # Determine root cause exception.
             $innermostException = Get-InnermostException $_.Exception
            
-            # Rethrow exception when maximum retries are reached
+            # Rethrow exception when maximum retries are reached.
             if ($retries -ge $MaxRetries) {
                 throw (New-Object System.Management.Automation.RuntimeException("Test failed even after $($MaxRetries) retries.", $_.Exception))
             }
-            # Retry when exception is caused by a transient error
+            # Retry when exception is caused by a transient error.
             elseif ($innermostException -is [System.Threading.Tasks.TaskCanceledException]) {
                 Write-Host "Test failed due to a transient error. Retrying..."
                 $retries++
                 continue
             }
-            # Rethrow exception when it is caused by a non-transient error
+            # Rethrow exception when it is caused by a non-transient error.
             else {
                 throw $_.Exception
             }
@@ -155,16 +155,16 @@ function AzTest {
         [Switch] $ResourceGroup
     )
 
-    # Retries the test on transient errors
+    # Retries the test on transient errors.
     AzRetry {
-        # When a dedicated resource group should be created for the test
+        # When a dedicated resource group should be created for the test.
         if ($ResourceGroup) {
             try {
                 $resourceGroup = New-ResourceGroupTest
                 Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
             }
             finally {
-                # Stops on failures during clean-up 
+                # Stops on failures during clean-up. 
                 AzCleanUp {
                     Remove-AzResourceGroup -Name $ResourceGroup.ResourceGroupName -Force -AsJob
                 }
@@ -199,7 +199,7 @@ function Get-InnermostException {
         [System.Exception] $Exception
     )
 
-    # Innermost exceptions do not have an inner exception
+    # Innermost exceptions do not have an inner exception.
     if ($null -eq $Exception.InnerException) {
         return $Exception
     }

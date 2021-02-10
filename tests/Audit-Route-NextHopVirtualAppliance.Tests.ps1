@@ -11,7 +11,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
             AzTest -ResourceGroup {
                 param($ResourceGroup)
 
-                # Create compliant route table
+                # Create compliant route table.
                 $route = New-AzRouteConfig `
                     -Name "default" `
                     -AddressPrefix "0.0.0.0/0" `
@@ -25,10 +25,10 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                     -Location $ResourceGroup.Location `
                     -Route $Route
 
-                # Trigger compliance scan for resource group and wait for completion
+                # Trigger compliance scan for resource group and wait for completion.
                 $ResourceGroup | Complete-PolicyComplianceScan 
 
-                # Verify that network security group is incompliant
+                # Verify that route table is compliant.
                 $routeTable 
                 | Get-PolicyComplianceState -PolicyDefinitionName "Audit-Route-NextHopVirtualAppliance"
                 | Should -BeTrue
@@ -39,7 +39,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
             AzTest -ResourceGroup {
                 param($ResourceGroup)
 
-                # Create incompliant route table by deleting route 0.0.0.0/0 pointing to the virtual appliance
+                # Create incompliant route table by deleting route 0.0.0.0/0 pointing to the virtual appliance.
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
                     -ResourceGroupName $ResourceGroup.ResourceGroupName `
@@ -50,10 +50,10 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
 
                 $routeTable | Invoke-RouteDelete -Route $route
 
-                # Trigger compliance scan for resource group and wait for completion
+                # Trigger compliance scan for resource group and wait for completion.
                 $ResourceGroup | Complete-PolicyComplianceScan 
 
-                # Verify that network security group is incompliant
+                # Verify that route table is incompliant.
                 $routeTable 
                 | Get-PolicyComplianceState -PolicyDefinitionName "Audit-Route-NextHopVirtualAppliance"
                 | Should -BeFalse

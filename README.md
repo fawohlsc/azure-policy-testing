@@ -235,7 +235,7 @@ It "Should deny incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "den
 }
 ```
 
-For reusability reason, the utility methods like ```Invoke-RoutePut``` were moved into dedicated PowerShell Modules (See: [RouteTable.Utils.psm1](./utils/RouteTable.Utils.psm1)):
+For reusability reasons, the utility methods like ```Invoke-RoutePut``` were moved into dedicated PowerShell Modules (See: [RouteTable.Utils.psm1](./utils/RouteTable.Utils.psm1)):
 
 ```powershell
 function Invoke-RoutePut {
@@ -528,35 +528,25 @@ Before going into the steps to setup this repository with your GitHub account us
 
 ```bash
 .
+├── .azure-pipelines
 ├── .github
-│   └── workflows
-│       ├── psmodules.json
-│       └── test-policies.yml
-├── LICENSE
-├── README.md
 ├── docs
-│   ├── azure-powershell-debug.png
-│   ├── pester-test-results.png
-│   └── test-pyramid.png
 ├── policies
-│   ├── Append-Route-NextHopVirtualAppliance
-│   │   ├── assign.test.json
-│   │   └── policy.json
-│   ├── Audit-Route-NextHopVirtualAppliance
-│   │   ├── assign.test.json
-│   │   └── policy.json
-│   └── Deploy-Route-NextHopVirtualAppliance
-│       ├── assign.test.json
-│       └── policy.json
-└── tests
-    ├── Policy.Tests.ps1
-    └── Policy.Utils.psm1
+├── tests
+└── utils
 ```
 
-- **.github/workflows**: Contains the GitHub workflow used to create the policy definitions, assign them to your subscription and run the tests. The GitHub action *[azure/manage-azure-policy@v0](https://github.com/marketplace/actions/manage-azure-policy)* is still pre-release and does not yet support management groups. Also, it has an has an issue related policies with remediation task support (See: [GitHub Issue #23](https://github.com/Azure/manage-azure-policy/issues/23)). This issue is mitigated by a workaround in the GitHub workflow (See: [Fix Azure Policy Assignment](./.github/workflows/test-policies.yml)).
-- **docs**: Contains any additional Markdown files and images used for documentation purposes, except the **README.md** at the root, which serves as the entry point.
-- **policies**: All the policy definitions and assignments are placed here. The GitHub workflow replaces the token ```#{AZURE_SUBSCRIPTION_ID}#``` with a GitHub secret called ```AZURE_SUBSCRIPTION_ID``` to ease the setup in your Azure environment. Initially, the policies were exported via the Azure Portal using the new [Export definitions](https://docs.microsoft.com/en-us/azure/governance/policy/how-to/export-resources) feature, but new policies can also be created manually and placed in here.
-- **tests**: This is were all the magic happens. The tests itself are defined in [Policy.Tests.ps1](./tests/Policy.Tests.ps1),which imports the PowerShell module [Policy.Utils.psm1](./tests/Policy.Utils.psm1) containing the utility or helper methods.
+- **.azure-pipelines**: The [Azure YAML pipeline](https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=schema%2Cparameter-schema) creates the policy definitions, assigns them to your subscription and runs the tests.
+- **.github**: The [GitHub Actions workflow](https://github.com/features/actions) creates the policy definitions, assigns them to your subscription and runs the tests.
+- **docs**: The Markdown files and images used for documentation purposes are placed in this folder, except the **README.md** at the root, which serves as the entry point.
+- **policies**: All the policy definitions and assignments are placed here. Each policy is wrapped in an [ARM template](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/overview) to ease deployment, e.g.:
+```powershell
+Get-ChildItem -Path "./policies" | ForEach-Object {
+    New-AzDeployment -Location "northeurope" -TemplateFile $_.FullName
+}
+```
+- **tests**: This is were all the magic happens. Each policy is tested by a corresponding PowerShell script.
+- **utils**: For reusability reasons, the utility methods are moved into dedicated PowerShell modules. 
 
 ### Step Guide
 1. **Prerequisite:** You should have installed Azure CLI on your local machine to run the command or use the Azure CloudShell in the Azure portal. To install Azure CLI, follow [Install Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest). To use Azure CloudShell, follow [Quickstart for Bash in Azure Cloud Shell](https://docs.microsoft.com/en-us/azure/cloud-shell/quickstart).
@@ -631,7 +621,13 @@ $r = Invoke-Pester -Container $container -PassThru
 ```
 
 ### Is it possible to run the tests under a different user?
-Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you run the tests:
+Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you run the tests. Additionally, you can tag and then select the tests by user.
+
+```powershell
+It "..." -Tag "user" {
+    # ...
+}
+```
 
 ```yaml
 - name: Login to Azure
@@ -642,8 +638,10 @@ Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you run 
 - name: Test Azure Policies
   shell: pwsh
   run: |
-    Invoke-Pester -Output Detailed -CI
+    Invoke-Pester -Output Detailed -CI -Tags "user"
 ```
+
+> Do not mix testing Azure Policy and RBAC. If you need to test RBAC e.g., to validate custom roles, create dedicated PowerShell scripts in the [tests](./tests/) folder. This helps you to keep your code clean by separating concerns.
 
 ### Why did you assign the policies to subscription and not management group scope?
 Mainly to reduce complexity when explaining the approach and to ease setting it up in your Azure environment. Another reason is that, the GitHub action *[azure/manage-azure-policy@v0](https://github.com/marketplace/actions/manage-azure-policy)* is still pre-release and does not yet support management groups. While the action can certainly be replaced with some script written in Azure PowerShell, creating policy definitions and assignments is not the main scope of this repository. The focus lies on testing policies. If you want to learn more about managing Azure at scale, checkout [Enterprise Scale](https://github.com/Azure/Enterprise-Scale).

@@ -22,7 +22,7 @@ jobs:
       - name: Install PowerShell modules
         shell: pwsh
         run: |
-          Install-Module -Name 'Az' -RequiredVersion '4.7.0' -Force -Scope CurrentUser -ErrorAction Stop
+          Install-Module -Name "Az" -RequiredVersion "4.7.0" -Force -Scope CurrentUser -ErrorAction Stop
       - name: Login to Azure
         uses: azure/login@v1
         with:
@@ -31,8 +31,8 @@ jobs:
       - name: Create or update Azure Policies
         shell: pwsh
         run: |
-          Get-ChildItem -Path './policies' | ForEach-Object {
-            New-AzDeployment -Location 'northeurope' -TemplateFile $_.FullName
+          Get-ChildItem -Path "./policies" | ForEach-Object {
+            New-AzDeployment -Location "northeurope" -TemplateFile $_.FullName
           }
       # Logout/Login to Azure to ensure that the latest policies are applied
       - name: Logout of Azure

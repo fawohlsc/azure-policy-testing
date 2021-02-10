@@ -10,62 +10,68 @@ Let's start simple: Why should you test Azure Policy in the first place? It's ju
 
 ```json
 {
-    "mode": "All",
-    "parameters": {
-        "routeTableSettings": {
-            "type": "Object",
-            "metadata": {
-                "displayName": "Route Table Settings",
-                "description": "Location-specific settings for route tables."
-            }
-        }
-    },
-    "policyRule": {
-        "if": {
-            "allOf": [
-                {
-                    "field": "type",
-                    "equals": "Microsoft.Network/routeTables"
-                },
-                {
-                    "count": {
-                        "field": "Microsoft.Network/routeTables/routes[*]",
-                        "where": {
-                            "allOf": [
-                                {
-                                    "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
-                                    "equals": "0.0.0.0/0"
-                                },
-                                {
-                                    "field": "Microsoft.Network/routeTables/routes[*].nextHopType",
-                                    "equals": "VirtualAppliance"
-                                },
-                                {
-                                    "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
-                                    "equals": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
-                                }
-                            ]
-                        }
-                    },
-                    "equals": 0
-                }
-            ]
+    "name": "[variables('policyName')]",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "apiVersion": "2020-03-01",
+    "properties": {
+        "policyType": "Custom",
+        "mode": "All",
+        "displayName": "[variables('policyName')]",
+        "description": "[variables('policyDescription')]",
+        "metadata": {
+            "category": "[variables('policyCategory')]"
         },
-        "then": {
-            "effect": "append",
-            "details": [
-                {
-                    "field": "Microsoft.Network/routeTables/routes[*]",
-                    "value": {
-                        "name": "internet",
-                        "properties": {
-                            "addressPrefix": "0.0.0.0/0",
-                            "nextHopType": "VirtualAppliance",
-                            "nextHopIpAddress": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
-                        }
-                    }
+        "parameters": {
+            "routeTableSettings": {
+                "type": "Object",
+                "metadata": {
+                    "displayName": "Route Table Settings",
+                    "description": "Location-specific settings for route tables."
                 }
-            ]
+            }
+        },
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Network/routeTables"
+                    },
+                    {
+                        "count": {
+                            "field": "Microsoft.Network/routeTables/routes[*]",
+                            "where": {
+                                "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
+                                "equals": "0.0.0.0/0"
+                            }
+                        },
+                        "equals": 0
+                    }
+                ]
+            },
+            "then": {
+                "effect": "modify",
+                "details": {
+                    "roleDefinitionIds": [
+                        "[variables('policyRoleDefinitionId')]"
+                    ],
+                    "conflictEffect": "audit",
+                    "operations": [
+                        {
+                            "operation": "add",
+                            "field": "Microsoft.Network/routeTables/routes[*]",
+                            "value": {
+                                "name": "default",
+                                "properties": {
+                                    "addressPrefix": "0.0.0.0/0",
+                                    "nextHopType": "VirtualAppliance",
+                                    "nextHopIpAddress": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
         }
     }
 }
@@ -93,37 +99,54 @@ For our API Tests, we will use **Azure PowerShell** to call the Azure REST API. 
 First, Azure PowerShell handles a lot of low-level details which you would be exposed to when directly calling the API. For instance, for long-running operations, the HTTP status code 202 (Accepted) and an URL for the status update to determine when the operation is completed is returned. This basically means that you have to perform [busy waiting](https://en.wikipedia.org/wiki/Busy_waiting) and periodically call the URL for the status update to wait for the operations to complete. Later is important for policy remediation and compliance scans, which can take a few minutes to complete. All this is already handled for you in Azure PowerShell (See: [LongRunningOperationHelper.cs](https://github.com/Azure/azure-powershell/blob/1bcbe7b1f7a3323ac98f7754ba03eeb6b45e79f2/src/Resources/ResourceManager/Components/LongRunningOperationHelper.cs#L139)). Just see this sample code written in Azure PowerShell, which is easy to understand even without a lot of explanations:
 
 ```powershell
-# Create route table
-$routeTableName = "route-table"
-New-AzRouteTable `
-    -Name $routeTableName `
+# Create route table.
+$routeTable = New-AzRouteTable `
+    -Name "route-table" `
     -ResourceGroupName $ResourceGroup.ResourceGroupName `
     -Location $ResourceGroup.Location
-            
-# Verify that route pointing to the virtual appliance was appended by policy
-Get-AzRouteTable -ResourceGroupName $ResourceGroup.ResourceGroupName -Name $routeTableName
+
+# Verify that route 0.0.0.0/0 was added by policy.
+$routeTable
 | Test-RouteNextHopVirtualAppliance
 | Should -BeTrue
 ```
 
-Second, Azure PowerShell also allows you to fallback and conveniently directly call the Azure REST API when needed (Side note: Azure Policy only applies to PUT and PATCH requests, so DELETE requests are not captured):
+Second, Azure PowerShell also allows you to fallback and conveniently directly call the Azure REST API when needed:
 
 ```powershell
-# Remove-AzRouteConfig will issue a PUT request for routeTables and hence the route will be appended by policy.
-# In order to remove the route, directly call the REST API by issuing a DELETE request for route.
 $httpResponse = Invoke-AzRestMethod `
     -ResourceGroupName $RouteTable.ResourceGroupName `
     -ResourceProviderName "Microsoft.Network" `
     -ResourceType @("routeTables", "routes") `
-    -Name @($RouteTable.Name, $route.Name) `
+    -Name @($RouteTable.Name, $Route.Name) `
     -ApiVersion "2020-05-01" `
     -Method "DELETE"
 
-# When HTTP request is not successful
-if (-not ($httpResponse.StatusCode -in 200..299)) {
-    throw "Route '$($route.Name)' could not be removed from route table '$($RouteTable.Name)'."
+# Handling the HTTP status codes returned by the DELETE request for route.
+# See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/delete
+# Accepted.
+if ($httpResponse.StatusCode -eq 200) {
+    # All good, do nothing.
+}
+# Accepted and the operation will complete asynchronously.
+elseif ($httpResponse.StatusCode -eq 202) {
+    # Invoke-AzRestMethod currently does not support awaiting asynchronous operations.
+    # See also: https://github.com/Azure/azure-powershell/issues/13293
+    $asyncOperation = $httpResponse | Wait-AsyncOperation
+    if ($asyncOperation.Status -ne "Succeeded") {
+        throw "Asynchronous operation failed with message: '$($asyncOperation)'"
+    }
+}
+# Route was deleted or not found.
+elseif ($httpResponse.StatusCode -eq 204) {
+    # All good, do nothing
+}
+# Error response describing why the operation failed.
+else {
+    throw "Operation failed with message: '$($httpResponse.Content)'"
 }
 ```
+
 Additionally, you can view any underlying HTTP request initiated by Azure PowerShell and the corresponding HTTP response even when using the high-level methods using the ```-Debug``` flag:
 
 ```powershell
@@ -131,40 +154,40 @@ Get-AzResourceGroup -Debug
 ```
 ![Detailed output of Azure PowerShell when using -Debug flag](./docs/azure-powershell-debug.png)
 
-Third, Azure Policy is well supported and documented in Azure PowerShell. Just see this more complex example to trigger a long-running policy remediation including an upfront compliance scan for a policy with [DeployIfNotExist](https://docs.microsoft.com/en-us/azure/governance/policy/concepts/effects#deployifnotexists) effect:
+Third, Azure Policy is well supported and documented in Azure PowerShell. Just see this more complex example to trigger a long-running policy remediation including an upfront compliance scan for a policy with [Modify](https://docs.microsoft.com/en-us/azure/governance/policy/concepts/effects#modify) effect:
 
 ```powershell
+# Trigger and wait for remediation.
 $job = Start-AzPolicyRemediation `
-    -ResourceGroupName $ResourceGroup.ResourceGroupName `
+    -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
+    -Scope $Resource.Id `
     -PolicyAssignmentId $policyAssignmentId `
-    -Name $ResourceGroup.ResourceGroupName `
     -ResourceDiscoveryMode ReEvaluateCompliance `
-    -LocationFilter $ResourceGroup.Location `
     -AsJob
 $remediation = $job | Wait-Job | Receive-Job
-    
-# If remediation is not successful
-if ($remediation.ProvisioningState -ne "Succeeded") {
-    throw "Policy '$($PolicyName)' could not remediate resource group '$($ResourceGroup.ResourceGroupName)'."
-}
+
+# Check remediation provisioning state and deployment when required.
+$succeeded = $remediation.ProvisioningState -eq "Succeeded"
 ```
 
 When using Azure PowerShell or PowerShell in general, you can also make use of its powerful test framework [Pester](https://pester.dev/docs/quick-start). Pester is based on [Behavior-driven Development](https://en.wikipedia.org/wiki/Behavior-driven_development) (BDD), a software development approach that has evolved from [Test-driven Development](https://en.wikipedia.org/wiki/Test-driven_development) (TDD). It differs by being written in a shared [Domain-specific Language](https://en.wikipedia.org/wiki/Domain-specific_language) (DSL), which improves communication between tech and non-tech teams and stakeholders, i.e. developers creating Azure Policies and compliance officers and security experts defining their requirements. In both development approaches, tests are written ahead of the code, but in BDD, tests are more user-focused and based on the system’s behavior (See: [Powershell BDD with Pester](https://www.netscylla.com/blog/2019/04/28/Powershell-BDD-with-Pester.html)). In the context of Azure Policy, a test written in Pester might look like this:
 
 ```powershell
-Context "When route table is created" -Tag route-table-create {
-    It "Should append route pointing to the virtual appliance (Policy: Append-Route-NextHopVirtualAppliance)" {
-        # Create route table
-        routeTableName = "route-table"
-        New-AzRouteTable `
-            -Name $routeTableName `
-            -ResourceGroupName $ResourceGroup.ResourceGroupName `
-            -Location $ResourceGroup.Location
-
-        # Verify that route pointing to the virtual appliance was appended by policy
-        Get-AzRouteTable -ResourceGroupName $ResourceGroup.ResourceGroupName -Name $routeTableName
-        | Test-RouteNextHopVirtualAppliance
-        | Should -BeTrue
+Context "When route table is created or updated" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update" {
+    It "Should add missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update-10" {
+        AzTest -ResourceGroup {
+            param($ResourceGroup)
+            
+            $routeTable = New-AzRouteTable `
+                -Name "route-table" `
+                -ResourceGroupName $ResourceGroup.ResourceGroupName `
+                -Location $ResourceGroup.Location
+        
+            # Verify that route 0.0.0.0/0 was added by policy.
+            $routeTable
+            | Test-RouteNextHopVirtualAppliance
+            | Should -BeTrue
+        }
     }
 }
 ```
@@ -186,87 +209,124 @@ As you can see, we can combine Pester and Azure PowerShell to conveniently test 
 - **Asynchronously** evaluated
 - **Asynchronously** evaluated with **remediation task** support
 
-Policy effects, which are **synchronously** evaluated are *Append*, *Deny* and *Modify* ((See: [Append-Route-NextHopVirtualAppliance](./policies/Append-Route-NextHopVirtualAppliance/policy.json))). Basically, the policies already take effect during the PATCH/PUT request. Testing them with Azure PowerShell is quiet straightforward and basically just performing a PATCH/PUT request like creating a route table (See: [Policy.Tests.ps1](./tests/Policy.Tests.ps1)):
+Policy effects, which are **synchronously** evaluated are *Append*, *Deny* and *Modify* (See: [Deny-Route-NextHopVirtualAppliance](./policies/Deny-Route-NextHopVirtualAppliance.json)). Basically, the policies already take effect during the PATCH/PUT request. Testing them with Azure PowerShell is quiet straightforward and basically just performing a PATCH/PUT request like creating a route (See: [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1)):
 
 ```powershell
-Context "When route table is created" -Tag route-table-create {
-    It "Should append route pointing to the virtual appliance (Policy: Append-Route-NextHopVirtualAppliance)" {
-        # Create route table
-        $routeTableName = "route-table"
-        New-AzRouteTable `
-        -Name $routeTableName `
-        -ResourceGroupName $ResourceGroup.ResourceGroupName `
-        -Location $ResourceGroup.Location
+Context "When route is created or updated" -Tag "deny-route-nexthopvirtualappliance-route-create-update" {
+It "Should deny incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-10" {
+        AzTest -ResourceGroup {
+            param($ResourceGroup)
             
-        # Verify that route pointing to the virtual appliance was appended by policy
-        Get-AzRouteTable -ResourceGroupName $ResourceGroup.ResourceGroupName -Name $routeTableName
-        | Test-RouteNextHopVirtualAppliance
-        | Should -BeTrue
+            $routeTable = New-AzRouteTable `
+                -Name "route-table" `
+                -ResourceGroupName $ResourceGroup.ResourceGroupName `
+                -Location $ResourceGroup.Location
+
+            # Should be disallowed by policy, so exception should be thrown.
+            {
+                # Directly calling REST API with PUT routes, since New-AzRouteConfig/Set-AzRouteTable will issue PUT routeTables.
+                $routeTable | Invoke-RoutePut `
+                    -Name "default" `
+                    -AddressPrefix "0.0.0.0/0" `
+                    -NextHopType "None" # Incompliant.
+            } | Should -Throw "*RequestDisallowedByPolicy*Deny-Route-NextHopVirtualAppliance*"
+        }
     }
 }
 ```
 
-For reusability reason, the utility methods like ```Test-RouteNextHopVirtualAppliance``` were moved into a dedicated PowerShell Module (See: [Policy.Utils.psm1](./tests/Policy.Utils.psm1)):
+For reusability reason, the utility methods like ```Invoke-RoutePut``` were moved into dedicated PowerShell Modules (See: [RouteTable.Utils.psm1](./utils/RouteTable.Utils.psm1)):
 
 ```powershell
-function Test-RouteNextHopVirtualAppliance {
+function Invoke-RoutePut {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable
+        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$AddressPrefix,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$NextHopType,
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$NextHopIpAddress
     )
-    
-    $route = $RouteTable | Get-RouteNextHopVirtualAppliance 
 
-    return $null -ne $route
-}
-
-function Get-RouteNextHopVirtualAppliance {
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable
-    )
-    
-    $addressPrefix = "0.0.0.0/0"
-    $nextHopType = "VirtualAppliance"
-    $nextHopIpAddress > $null
-    switch ($RouteTable.Location) {
-        "northeurope" { $nextHopIpAddress = "10.0.0.23"; break }
-        "westeurope" { $nextHopIpAddress = "10.1.0.23"; break }
-        default { throw "Location '$($RouteTable.Location)' not handled." }
+    $payload = @"
+{
+    "properties":   {
+        "addressPrefix": "$($AddressPrefix)",
+        "nextHopType": "$($NextHopType)",
+        "nextHopIpAddress": "$($NextHopIpAddress)"
     }
+}
+"@
+    
+    $httpResponse = Invoke-AzRestMethod `
+        -ResourceGroupName $RouteTable.ResourceGroupName `
+        -ResourceProviderName "Microsoft.Network" `
+        -ResourceType @("routeTables", "routes") `
+        -Name @($RouteTable.Name, $Name) `
+        -ApiVersion "2020-05-01" `
+        -Method "PUT" `
+        -Payload $payload
 
-    $route = $RouteTable.Routes | Where-Object { 
-        ($_.AddressPrefix -eq $addressPrefix) -and
-        ($_.NextHopType -eq $nextHopType) -and
-        ($_.NextHopIpAddress -eq $nextHopIpAddress)
-    } | Select-Object -First 1 # Address prefixes are unique within a route table
-
-    return $route
+    # Handling the HTTP status codes returned by the PUT request for route.
+    # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate
+    # Update successful. The operation returns the resulting Route resource.
+    if ($httpResponse.StatusCode -eq 200) {
+        # All good, do nothing.
+    }
+    # Create successful. The operation returns the resulting Route resource.
+    elseif ($httpResponse.StatusCode -eq 201) {
+        # Invoke-AzRestMethod currently does not support awaiting asynchronous operations.
+        # See also: https://github.com/Azure/azure-powershell/issues/13293
+        $asyncOperation = $httpResponse | Wait-AsyncOperation
+        if ($asyncOperation.Status -ne "Succeeded") {
+            throw "Asynchronous operation failed with message: '$($asyncOperation)'"
+        }
+    }
+    # Error response describing why the operation failed.
+    else {
+        throw "Operation failed with message: '$($httpResponse.Content)'"
+    }
 }
 ```
 
-**Asynchronously** evaluated policy effects are *Audit* and *AuditIfNotExists*. The PATCH/PUT request just triggers a compliance scan, but the evaluation happens asynchronously in the background, e.g. [Audit-Route-NextHopVirtualAppliance](./policies/Audit-Route-NextHopVirtualAppliance/policy.json). As it turns out, we can manually trigger a compliance scan and wait for its completion by using Azure PowerShell (See: [Policy.Tests.ps1](./tests/Policy.Tests.ps1) and [Policy.Utils.psm1](./tests/Policy.Utils.psm1)):
+**Asynchronously** evaluated policy effects are *Audit* and *AuditIfNotExists*. The PATCH/PUT request just triggers a compliance scan, but the evaluation happens asynchronously in the background, e.g. [Audit-Route-NextHopVirtualAppliance](./policies/Audit-Route-NextHopVirtualAppliance.json). As it turns out, we can manually trigger a compliance scan and wait for its completion by using Azure PowerShell (See: [Audit-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Audit-Route-NextHopVirtualAppliance.Tests.ps1) and [Policy.Utils.psm1](./utils/Policy.Utils.psm1)):
 
 ```powershell
-Context "When route is deleted" -Tag route-delete {
-    It "Should audit route pointing to the virtual appliance (Audit-Route-NextHopVirtualAppliance)" {
-        # Create route table and remove route pointing to the virtual appliance, which was appended by policy
-        $routeTableName = "route-table"
-        $routeTable = New-AzRouteTable `
-            -Name $routeTableName `
-            -ResourceGroupName $ResourceGroup.ResourceGroupName `
-            -Location $ResourceGroup.Location
-        | Remove-RouteNextHopVirtualAppliance
+Context "When auditing route tables" {
+    It "Should mark route table as compliant with route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-compliant" {
+        AzTest -ResourceGroup {
+            param($ResourceGroup)
 
-        # Trigger compliance scan for resource group and wait for completion
-        $ResourceGroup | Complete-PolicyComplianceScan 
+            # Create compliant route table.
+            $route = New-AzRouteConfig `
+                -Name "default" `
+                -AddressPrefix "0.0.0.0/0" `
+                -NextHopType "VirtualAppliance" `
+                -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $ResourceGroup.Location)
+                        
+            $routeTable = New-AzRouteTable `
+                -Name "route-table" `
+                -ResourceGroupName $ResourceGroup.ResourceGroupName `
+                -Location $ResourceGroup.Location `
+                -Route $Route
 
-        # Verify that route table is incompliant
-        $routeTable 
-        | Get-PolicyComplianceState -PolicyName "Audit-Route-NextHopVirtualAppliance"
-        | Should -BeFalse
+            # Trigger compliance scan for resource group and wait for completion.
+            $ResourceGroup | Complete-PolicyComplianceScan 
+
+            # Verify that route table is compliant.
+            $routeTable 
+            | Get-PolicyComplianceState -PolicyDefinitionName "Audit-Route-NextHopVirtualAppliance"
+            | Should -BeTrue
+        }
     }
 }
 
@@ -274,60 +334,108 @@ function Complete-PolicyComplianceScan {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup
+        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$MaxRetries = 3
     )
 
-    $job = Start-AzPolicyComplianceScan -ResourceGroupName $ResourceGroup.ResourceGroupName -AsJob 
-    $job | Wait-Job
+    # Policy compliance scan might fail, hence retrying to avoid flaky tests.
+    $retries = 0
+    do {
+        $job = Start-AzPolicyComplianceScan -ResourceGroupName $ResourceGroup.ResourceGroupName -PassThru -AsJob 
+        $succeeded = $job | Wait-Job | Receive-Job
+        
+        if ($succeeded) {
+            break
+        }
+        # Failure: Retry policy compliance scan when still below maximum retries.
+        elseif ($retries -le $MaxRetries) {
+            Write-Host "Policy compliance scan for resource group '$($ResourceGroup.ResourceId)' failed. Retrying..."
+            $retries++
+            continue # Not required, just defensive programming.
+        }
+        # Failure: Policy compliance scan is still failing after maximum retries.
+        else {
+            throw "Policy compliance scan for resource group '$($ResourceGroup.ResourceId)' failed even after $($MaxRetries) retries."
+        }
+    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 }
 
 function Get-PolicyComplianceState {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSResourceId]$Resource,
+        [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PolicyName
+        [string]$PolicyDefinitionName,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$WaitSeconds = 60,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$MaxRetries = 30
     )
 
-    $policyDefinition = Get-AzPolicyDefinition | Where-Object { $_.Properties.DisplayName -eq $PolicyName }
-    
-    if ($null -eq $policyDefinition) {
-        $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
-        throw "Policy definition '$($PolicyName)' was not found at scope '$($scope)'."
-    }
+    # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
+    # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
+    $retries = 0
+    do {
+        $isCompliant = (Get-AzPolicyState `
+                -PolicyDefinitionName $PolicyDefinitionName `
+                -Filter "ResourceId eq '$($Resource.Id)'" `
+        ).IsCompliant
+        
+        # Success: Policy compliance state is not null.
+        if ($null -ne $isCompliant) {
+            break
+        }
+        # Failure: Policy compliance state is null, so wait a few seconds and retry when still below maximum retries.
+        elseif ($retries -le $MaxRetries) {
+            Write-Host "Policy '$($PolicyDefinitionName)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null. Retrying..."
+            Start-Sleep -Seconds $WaitSeconds
+            $retries++
+            continue # Not required, just defensive programming.
+        }
+        # Failure: Policy compliance state still null after maximum retries.
+        else {
+            throw "Policy '$($PolicyDefinitionName)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
+        }
+    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 
-    $compliant = (
-        Get-AzPolicyState -PolicyDefinitionName $policyDefinition.Name 
-        | Where-Object { $_.ResourceId -eq $Resource.Id } 
-        | Select-Object -Property ComplianceState
-    ).ComplianceState -eq "Compliant"
-
-    return $compliant
+    return $isCompliant
 }
 ```
 
-Last but not least, the **asynchronously** evaluated policy effects with **remediation task** support are *DeployIfNotExists* and *Modify*. Same as the asynchronously evaluated policies, the compliance scan happens in the background. Additionally, non-compliant resources can be remediated with a remediation task. When testing these kind of policy effects, the easiest way is to just start a remediation task including an upfront compliance scan (See: [Policy.Tests.ps1](./tests/Policy.Tests.ps1) and [Policy.Utils.psm1](./tests/Policy.Utils.psm1)):
+Last but not least, the **asynchronously** evaluated policy effects with **remediation task** support are *DeployIfNotExists* and *Modify*. Same as the asynchronously evaluated policies, the compliance scan happens in the background. Additionally, non-compliant resources can be remediated with a remediation task. When testing these kind of policy effects, the easiest way is to just start a remediation task including an upfront compliance scan (See: [Modify-RouteTable-NextHopVirtualAppliance.Tests.ps1](./tests/Modify-RouteTable-NextHopVirtualAppliance.Tests.ps1) and [Policy.Utils.psm1](./utils/Policy.Utils.psm1)):
 
 ```powershell
-Context "When route is deleted" -Tag route-delete {
-    It "Should remediate route pointing to the virtual appliance (Policy: Deploy-Route-NextHopVirtualAppliance)" {
-        # Create route table and remove route pointing to the virtual appliance, which was appended by policy
-        $routeTableName = "route-table"
-        New-AzRouteTable `
-            -Name $routeTableName `
-            -ResourceGroupName $ResourceGroup.ResourceGroupName `
-            -Location $ResourceGroup.Location
-        | Remove-RouteNextHopVirtualAppliance
+Context "When route is deleted" -Tag "modify-routetable-nexthopvirtualappliance-route-delete" {
+    It "Should remediate missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-route-delete-10" {
+        AzTest -ResourceGroup {
+            param($ResourceGroup)
 
-        # Remediate resource group and wait for completion
-        $ResourceGroup | Complete-PolicyRemediation -PolicyName "Deploy-Route-NextHopVirtualAppliance"
-
-        # Verify that removed route pointing to the virtual appliance was remediated by policy
-        Get-AzRouteTable -ResourceGroupName $ResourceGroup.ResourceGroupName -Name $routeTableName
-        | Test-RouteNextHopVirtualAppliance
-        | Should -BeTrue
+            $routeTable = New-AzRouteTable `
+                -Name "route-table" `
+                -ResourceGroupName $ResourceGroup.ResourceGroupName `
+                -Location $ResourceGroup.Location
+            
+            # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy.
+            $route = Get-RouteNextHopVirtualAppliance -RouteTable $routeTable
+            
+            # Remove-AzRouteConfig/Set-AzRouteTable will issue a PUT request for routeTables and hence policy might kick in.
+            # In order to delete the route without policy interfering, directly call the REST API by issuing a DELETE request for route.
+            $routeTable | Invoke-RouteDelete -Route $route
+        
+            # Remediate route table by policy and wait for completion.
+            $routeTable | Complete-PolicyRemediation -PolicyDefinitionName "Modify-RouteTable-NextHopVirtualAppliance" -CheckDeployment
+        
+            # Verify that route 0.0.0.0/0 was added by policy remediation.
+            Get-AzRouteTable -ResourceGroupName $routeTable.ResourceGroupName -Name $routeTable.Name
+            | Test-RouteNextHopVirtualAppliance
+            | Should -BeTrue
+        }
     }
 }
 
@@ -335,36 +443,80 @@ function Complete-PolicyRemediation {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
+        [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PolicyName
+        [string]$PolicyDefinitionName,
+        [Parameter()]
+        [switch]$CheckDeployment,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$MaxRetries = 3
     )
     
+    # Determine policy assignment id.
     $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
     $policyAssignmentId = (Get-AzPolicyAssignment -Scope $scope
         | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
-        | Where-Object { $_.DisplayName -eq $PolicyName } 
+        | Where-Object { $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) } 
         | Select-Object -Property PolicyAssignmentId -First 1
     ).PolicyAssignmentId
     
     if ($null -eq $policyAssignmentId) {
-        throw "Policy assignment was not found for policy '$($PolicyName)' at scope '$($scope)'."
+        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($scope)'."
     }
 
-    $job = Start-AzPolicyRemediation `
-        -ResourceGroupName $ResourceGroup.ResourceGroupName `
-        -PolicyAssignmentId $policyAssignmentId `
-        -Name $ResourceGroup.ResourceGroupName `
-        -ResourceDiscoveryMode ReEvaluateCompliance `
-        -LocationFilter $ResourceGroup.Location `
-        -AsJob
-    $remediation = $job | Wait-Job | Receive-Job
-    
-    # When remediation is not successful
-    if ($remediation.ProvisioningState -ne "Succeeded") {
-        throw "Policy '$($PolicyName)' could not remediate resource group '$($ResourceGroup.ResourceGroupName)'."
-    }
+    # Remediation might be started before all previous changes on the resource in scope are completed.
+    # This race condition could lead to a successful remediation without any deployment being triggered.
+    # When a deployment is expected, it might be required to retry remediation to avoid flaky tests.
+    $retries = 0
+    do {
+        # Trigger and wait for remediation.
+        $job = Start-AzPolicyRemediation `
+            -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
+            -Scope $Resource.Id `
+            -PolicyAssignmentId $policyAssignmentId `
+            -ResourceDiscoveryMode ReEvaluateCompliance `
+            -AsJob
+        $remediation = $job | Wait-Job | Receive-Job
+        
+        # Check remediation provisioning state and deployment when required.
+        $succeeded = $remediation.ProvisioningState -eq "Succeeded"
+        if ($succeeded) {
+            if ($CheckDeployment) {
+                $deployed = $remediation.DeploymentSummary.TotalDeployments -gt 0
+                
+                # Success: Deployment was triggered.
+                if ($deployed) {
+                    break 
+                }
+                # Failure: No deployment was triggered, so retry when still below maximum retries.
+                elseif ($retries -le $MaxRetries) {
+                    Write-Host "Policy '$($PolicyDefinitionName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered. Retrying..."
+                    $retries++
+                    continue # Not required, just defensive programming.
+                }
+                # Failure: No deployment was triggered even after maximum retries.
+                else {
+                    throw "Policy '$($PolicyDefinitionName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
+                }
+            }
+            # Success: No deployment need to checked, hence no retry required.
+            else {
+                break
+            }
+        }
+        # Failure: Remediation failed, so retry when still below maximum retries.
+        elseif ($retries -le $MaxRetries) {
+            Write-Host "Policy '$($PolicyDefinitionName)' failed to remediate resource '$($Resource.Id)'. Retrying..."
+            $retries++
+            continue # Not required, just defensive programming.
+        }
+        # Failure: Remediation failed even after maximum retries.
+        else {
+            throw "Policy '$($PolicyDefinitionName)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
+        }
+    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 }
 ```
 

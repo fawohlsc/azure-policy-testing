@@ -58,8 +58,8 @@ Starts a remediation for a policy and awaits it's completion. In case of a failu
 .PARAMETER Resource
 The resource to be remediated.
 
-.PARAMETER PolicyDefinition
-The policy definition.
+.PARAMETER PolicyAssignmentDisplayName
+The display name of the policy assignment.
 
 .PARAMETER CheckDeployment
 The switch to determine if a deployment is expected. If a deployment is expected but did not happen during policy remediation, the policy remediation is retried.
@@ -77,7 +77,7 @@ function Complete-PolicyRemediation {
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinition,
+        [string]$PolicyAssignmentDisplayName,
         [Parameter()]
         [switch]$CheckDeployment,
         [Parameter()]
@@ -89,12 +89,12 @@ function Complete-PolicyRemediation {
     $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
     $policyAssignmentId = (Get-AzPolicyAssignment -Scope $scope
         | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
-        | Where-Object { $_.DisplayName -eq $PolicyDefinition } 
+        | Where-Object { $_.DisplayName -eq $PolicyAssignmentDisplayName } 
         | Select-Object -Property PolicyAssignmentId -First 1
     ).PolicyAssignmentId
     
     if ($null -eq $policyAssignmentId) {
-        throw "Policy assignment was not found for policy '$($PolicyDefinition)' at scope '$($scope)'."
+        throw "Policy assignment '$($PolicyAssignmentDisplayName)' was not found at scope '$($scope)'."
     }
 
     # Remediation might be started before all previous changes on the resource in scope are completed.
@@ -123,13 +123,13 @@ function Complete-PolicyRemediation {
                 }
                 # Failure: No deployment was triggered, so retry when still below maximum retries.
                 elseif ($retries -le $MaxRetries) {
-                    Write-Host "Policy '$($PolicyDefinition)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered. Retrying..."
+                    Write-Host "Policy assignment '$($PolicyAssignmentDisplayName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered. Retrying..."
                     $retries++
                     continue # Not required, just defensive programming.
                 }
                 # Failure: No deployment was triggered even after maximum retries.
                 else {
-                    throw "Policy '$($PolicyDefinition)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
+                    throw "Policy assignment '$($PolicyAssignmentDisplayName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
                 }
             }
             # Success: No deployment need to checked, hence no retry required.
@@ -139,13 +139,13 @@ function Complete-PolicyRemediation {
         }
         # Failure: Remediation failed, so retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
-            Write-Host "Policy '$($PolicyDefinition)' failed to remediate resource '$($Resource.Id)'. Retrying..."
+            Write-Host "Policy assignment '$($PolicyAssignmentDisplayName)' failed to remediate resource '$($Resource.Id)'. Retrying..."
             $retries++
             continue # Not required, just defensive programming.
         }
         # Failure: Remediation failed even after maximum retries.
         else {
-            throw "Policy '$($PolicyDefinition)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
+            throw "Policy assignment '$($PolicyAssignmentDisplayName)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 }
@@ -160,8 +160,8 @@ Gets the policy compliance state of a resource. In case of a failure, getting th
 .PARAMETER Resource
 The resource to get the policy compliance state for. 
 
-.PARAMETER PolicyDefinition
-The policy definition.
+.PARAMETER PolicyDefinitionName
+The name of the policy definition.
 
 .PARAMETER WaitSeconds
 The duration in seconds to wait between retries in case of failures (Default: 60s).
@@ -179,7 +179,7 @@ function Get-PolicyComplianceState {
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinition,
+        [string]$PolicyDefinitionName,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 60,
@@ -188,17 +188,12 @@ function Get-PolicyComplianceState {
         [ushort]$MaxRetries = 30
     )
 
-    # Determine policy definition name
-    $policyDefinitionName = (Get-AzPolicyDefinition 
-        | Where-Object { $_.Properties.DisplayName -eq $PolicyDefinition }
-    ).Name
-
     # Policy compliance scan might be completed, but poliy compliance state might still be null due to race conditions.
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
     do {
         $isCompliant = (Get-AzPolicyState `
-                -PolicyDefinitionName $policyDefinitionName `
+                -PolicyDefinitionName $PolicyDefinitionName `
                 -Filter "ResourceId eq '$($Resource.Id)'" `
         ).IsCompliant
         
@@ -208,14 +203,14 @@ function Get-PolicyComplianceState {
         }
         # Failure: Policy compliance state is null, so wait a few seconds and retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
-            Write-Host "Policy '$($PolicyDefinition)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null. Retrying..."
+            Write-Host "Policy '$($PolicyDefinitionName)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null. Retrying..."
             Start-Sleep -Seconds $WaitSeconds
             $retries++
             continue # Not required, just defensive programming.
         }
         # Failure: Policy compliance state still null after maximum retries.
         else {
-            throw "Policy '$($PolicyDefinition)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
+            throw "Policy '$($PolicyDefinitionName)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 

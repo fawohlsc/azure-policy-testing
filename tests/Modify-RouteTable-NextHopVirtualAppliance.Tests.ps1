@@ -45,7 +45,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                 $routeTable | Invoke-RouteDelete -Route $route
             
                 # Remediate route table by policy and wait for completion
-                $routeTable | Complete-PolicyRemediation -PolicyDefinition "Modify-RouteTable-NextHopVirtualAppliance" -CheckDeployment
+                $routeTable | Complete-PolicyRemediation -PolicyAssignmentDisplayName "Modify-RouteTable-NextHopVirtualAppliance" -CheckDeployment
             
                 # Verify that route 0.0.0.0/0 was added by policy remediation
                 Get-AzRouteTable -ResourceGroupName $routeTable.ResourceGroupName -Name $routeTable.Name

@@ -30,7 +30,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
 
                 # Verify that network security group is incompliant
                 $routeTable 
-                | Get-PolicyComplianceState -PolicyDefinition "Audit-Route-NextHopVirtualAppliance"
+                | Get-PolicyComplianceState -PolicyDefinitionName "Audit-Route-NextHopVirtualAppliance"
                 | Should -BeTrue
             }
         }
@@ -55,7 +55,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
 
                 # Verify that network security group is incompliant
                 $routeTable 
-                | Get-PolicyComplianceState -PolicyDefinition "Audit-Route-NextHopVirtualAppliance"
+                | Get-PolicyComplianceState -PolicyDefinitionName "Audit-Route-NextHopVirtualAppliance"
                 | Should -BeFalse
             }
         }

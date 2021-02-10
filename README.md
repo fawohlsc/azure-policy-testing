@@ -85,7 +85,8 @@ So how can we test Azure Policy? Which kind of tests should we perform? Martin F
 
 ![Martin Fowler's definition of a test pyramid](./docs/test-pyramid.png)
 
-**UI tests** typically are recording the interaction of the user with the user interface. When it comes to testing Azure Policy, a lot of people heavily rely on UI Tests using the Azure Portal. Basically, clicking through the Azure Portal and document each step. While this seems fine to get started with testing policies, its also very slow since a human being has to click through the portal and document each step. Since multiple policies can be assigned to the same scope or inherited from parent scopes (Management Group, Subscription and Resource Group), introducing a new policy can lead to regression bugs when overlapping with other existing policies. Just think of an example with two policies overlapping and both of them allowing different Azure regions for deployment - no deployment at all will be possible. Basically, this requires a lot of additional regression testing and further slows down the testing process. So, what about these handy tools for UI automation testing? Both automated and manual UI tests will be hard to maintain, since Azure is rapidly evolving and so is the Azure Portal. Additionally, browser caching issues might lead to false positives during UI testing. To cut a long story short, it is not possible to use manual or automated UI tests to validate Azure Policy in an effective and scalable manner, they are time consuming to run and hard to maintain.
+**UI tests** typically are recording the interaction of the user with the user interface. When it comes to testing Azure Policy, a lot of people heavily rely on UI Tests using the Azure Portal. Basically, clicking through the Azure Portal and document each step. While this seems fine to get started with testing policies, its also very slow since a human being has to click through the portal and document each step. Since multiple policies can be assigned to the same scope or inherited from parent scopes (Management Group, Subscription and Resource Group), introducing a new policy can lead to regression bugs when overlapping with other existing policies (See: [Layering policy definitions
+](https://docs.microsoft.com/en-us/azure/governance/policy/concepts/effects#layering-policy-definitions)). Just think of an example with two policies overlapping and both of them allowing different Azure regions for deployment - no deployment at all will be possible. Basically, this requires a lot of additional regression testing and further slows down the testing process. So, what about these handy tools for UI automation testing? Both automated and manual UI tests will be hard to maintain, since Azure is rapidly evolving and so is the Azure Portal. Additionally, browser caching issues might lead to false positives during UI testing. To cut a long story short, it is not possible to use manual or automated UI tests to validate Azure Policy in an effective and scalable manner, they are time consuming to run and hard to maintain.
 
 **Service tests** or **API tests** are actual code targeting the API layer. In the context of Azure Policy, you could actually call the [Azure REST API](https://docs.microsoft.com/en-us/rest/api/azure/) to perform tests, which is a much more stable and versioned contract to test against than the UI. Also, regression testing can be done way easier by just running all the test scripts either manually triggered or even better by performing [continuous integration](https://martinfowler.com/articles/continuousIntegration.html) within your DevOps pipeline of choice, i.e. [GitHub Actions](https://github.com/features/actions). Finally, since the tests are written as code, parallelization techniques can be applied to speed up the tests. Taking into consideration that performing compliance scans and remediation with Azure Policy can take a few minutes per test, parallelization helps to scale the test suite to potentially hundreds of tests. Going forward, we will prefer the term *API tests* instead of *service tests* since much more applicable when testing policies.
 
@@ -379,7 +380,7 @@ function Get-PolicyComplianceState {
 }
 ```
 
-Last but not least, the **asynchronously** evaluated policy effects with **remediation task** support are *DeployIfNotExists* and *Modify*. Same as the asynchronously evaluated policies, the compliance scan happens in the background. Additionally, non-compliant resources can be remediated with a remediation task. When testing these kind of policy effects, the easiest way is to just start a remediation task including an upfront compliance scan (See: [Modify-RouteTable-NextHopVirtualAppliance.Tests.ps1](./tests/Modify-RouteTable-NextHopVirtualAppliance.Tests.ps1) and [Policy.Utils.psm1](./utils/Policy.Utils.psm1)):
+Last but not least, the **asynchronously** evaluated policy effects with **remediation task** support are *DeployIfNotExists* and *Modify*. Just like the asynchronously evaluated policies, the compliance scan happens in the background. Additionally, non-compliant resources can be remediated with a remediation task. When testing these kind of policy effects, the easiest way is to just start a remediation task including an upfront compliance scan (See: [Modify-RouteTable-NextHopVirtualAppliance.Tests.ps1](./tests/Modify-RouteTable-NextHopVirtualAppliance.Tests.ps1) and [Policy.Utils.psm1](./utils/Policy.Utils.psm1)):
 
 ```powershell
 Context "When route is deleted" -Tag "modify-routetable-nexthopvirtualappliance-route-delete" {
@@ -491,6 +492,8 @@ function Complete-PolicyRemediation {
 }
 ```
 
+>Please note, that *Modify* can be evaluated both **synchronously** and **asynchronously**. 
+
 As you can see, the combination of Pester, Azure PowerShell and GitHub Actions is quiet powerful and convenient for testing Azure Policy. In the next chapter, we will describe how to setup this repository with your GitHub account using your Azure environment, so you can further explore it.
 
 ## Setup
@@ -547,7 +550,7 @@ Get-ChildItem -Path "./policies" | ForEach-Object {
 3. Change the ```README.md``` to represent your build status:
     
     ```markdown
-    ![](https://github.com/{YOUR GITHUB HANDLE}/azure-policy-testing/workflows/test-policies/badge.svg)
+    ![test-policies](https://github.com/{YOUR GITHUB HANDLE}/azure-policy-testing/workflows/test-policies/badge.svg)
     ```
     
 4. Manually run the ```test-policies``` GitHub workflow and wait for it to complete successfully: 
@@ -564,13 +567,13 @@ Get-ChildItem -Path "./policies" | ForEach-Object {
 
 
 ## FAQ
-### What should we consider when designing a test for a policy?
-There are many different 1st and 3rd party tools to provision resources in Azure e.g. ARM templates, Azure PowerShell, and Terraform. Under the hood, all of them are calling the Azure REST API. Hence, it makes sense to carefully study the [Azure REST API reference](https://docs.microsoft.com/en-us/rest/api/azure/) and [Azure REST API guidelines](https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md). Especially consider:
+### What should we consider when designing tests for policies?
+There are many different 1st and 3rd party tools to provision resources in Azure e.g. ARM templates, Azure PowerShell, and Terraform. Under the hood, all of them are calling the Azure REST API. Hence, it makes sense to carefully study the [Azure REST API reference](https://docs.microsoft.com/en-us/rest/api/azure/) and [Azure REST API guidelines](https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md) when designing tests for policies. Especially consider:
 - Structure your test cases around Azure REST API calls consider i.e., PUT, PATCH and DELETE requests. 
 - Policies currently do not trigger on DELETE only PUT and PATCH requests. Hence deleted resources can only be remediated asynchronously by using a remediation task.
 - When the [resource provider](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types) does not support PATCH requests, you do not need separate test cases for creating and updating resources since they both result in the same PUT request.
 - Some child resources e.g., [route](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate), can be created standalone or wrapped as inline property of their parent resource e.g., [route table](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate#request-body). Keep that in mind when designing and testing polices e.g., policy [Deny-Route-NextHopVirtualAppliance.json](./policies/Deny-Route-NextHopVirtualAppliance.json) and the corresponding tests [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1).
-- Accessing shared resources during your tests can cause race conditions, e.g. parallel test runs. Consider creating a dedicated resource group per test case to be best practice. [AzTest](./utils/Test.Utils.psm1) can automatically create and delete a resource group for you:
+- Accessing shared resources during your tests can cause race conditions, e.g. parallel test runs. Consider creating a dedicated resource group per test case to be a best practice. [AzTest](./utils/Test.Utils.psm1) can automatically create and delete a resource group for you:
 
 ```powershell
  It "..." -Tag "..." {
@@ -582,41 +585,26 @@ There are many different 1st and 3rd party tools to provision resources in Azure
 }
 ```
 
-### Should we run the tests to validate a pull request?
-Running the tests can take a few minutes up to some hours. The long duration is mainly caused by waiting for policy compliance scans and remediations to complete. So while you certainly can run the tests to validate your pull request, it is not advisable since a pull request should provide your developers feedback in just a couple of minutes to reduce their unproductive waiting time. That being said, running them as part of your [continuous integration](https://martinfowler.com/articles/continuousIntegration.html) on the main branch is what you should aim for. Alternatively, it might be just good enough to schedule a test run once a day.
-
-### The tests take a long time to complete, can we speed things up?
-Yes you can try to parallelize the tests. Pester itself currently does not natively support running tests in parallel (See [GitHub Issue #1270](https://github.com/pester/Pester/issues/1270)). What you can achieve this by splitting up the tests in multiple files e.g. by policy and run pester for each file in parallel:
+### Can we execute the tests on our local machines?
+Just like in your DevOps pipeline of choice, you can execute the tests on your local machines as well, e.g.:
 
 ```powershell
-$job = Get-ChildItem -Path "./tests" -Exclude "*.psm1" 
-| ForEach-Object -Parallel { 
-    Invoke-Pester -Path $_ -Output None -PassThru -CI  
-} -ThrottleLimit 10 -AsJob
-$testResults = $job | Wait-Job | Receive-Job  
+Invoke-Pester -Output Detailed
 ```
 
-Please consider above as sample code to give you an idea how to parallelize your tests. Parallelization is a future topic to cover in case there is enough community interest. Just as a side note, each job in a GitHub workflow can run for up to 6 hours of execution time. Following, your tests should finish before that or you can split them into multiple jobs, since GitHub workflows can run up to 72 hours.
-
-### Can we pass parameters to our tests?
-Yes you can. Starting with [Pester 5.1.0-beta2](https://www.powershellgallery.com/packages/Pester/) passing parameters is supported (See: [GitHub Issue #1485](https://github.com/pester/Pester/issues/1485)):
+### Is it possible to execute just a subset of the tests?
+You can leverage tags to execute just a subset of the tests, e.g.:
 
 ```powershell
-$container = @(
-    (New-TestContainer -Path $file -Data @{ Value = 1 })
-    (New-TestContainer -Path $file -Data @{ Value = 2 })
-)
-$r = Invoke-Pester -Container $container -PassThru
-```
+Invoke-Pester -Output Detailed -Tags "tag"
 
-### Is it possible to run the tests under a different user?
-Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you run the tests. Additionally, you can tag the tests by user and select them accordingly when running them in your DevOps pipeline or locally.
-
-```powershell
-It "..." -Tag "user" {
+It "..." -Tag "tag" {
     # ...
 }
 ```
+
+### Is it possible to execute the tests under a different user?
+Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you execute the tests. Additionally, you can tag the tests by user and select them accordingly when running them in your DevOps pipeline or locally.
 
 ```yaml
 - name: Login to Azure
@@ -630,7 +618,51 @@ It "..." -Tag "user" {
     Invoke-Pester -Output Detailed -CI -Tags "user"
 ```
 
-> Do not mix testing Azure Policy and RBAC. If you need to test RBAC e.g., to validate custom roles, create dedicated PowerShell scripts in the [tests](./tests/) folder. This helps you to keep your code clean by separating concerns.
+```powershell
+It "..." -Tag "user" {
+    # ...
+}
+```
+
+> Do not mix testing Azure Policy and RBAC. If you need to test RBAC e.g., to validate custom roles, create dedicated PowerShell scripts in the [tests](./tests/) folder. This separation helps you to keep your test maintainable by not mixing different concerns.
+
+### Can we pass parameters to our tests?
+Yes you can. Starting with [Pester 5.1.0-beta2](https://www.powershellgallery.com/packages/Pester/) passing parameters is supported (See: [GitHub Issue #1485](https://github.com/pester/Pester/issues/1485)):
+
+```powershell
+$container = @(
+    (New-TestContainer -Path $file -Data @{ Value = 1 })
+    (New-TestContainer -Path $file -Data @{ Value = 2 })
+)
+$r = Invoke-Pester -Container $container -PassThru
+```
+
+### The tests take a long time to complete, can we speed things up?
+Pester itself currently does not natively support it (See [GitHub Issue #1270](https://github.com/pester/Pester/issues/1270)), but you can achieve parallelization by invoking Pester multiple times:
+
+```powershell
+$job = Get-ChildItem -Path "./tests" -Exclude "*.psm1" 
+| ForEach-Object -Parallel { 
+    Invoke-Pester -Path $_ -Output None -PassThru -CI  
+} -ThrottleLimit 10 -AsJob
+$testResults = $job | Wait-Job | Receive-Job  
+```
+
+Please consider above as sample code to give you an idea how to parallelize your tests. Parallelization is a future topic to cover in case there is enough community interest. Just as a side note, each job in a GitHub workflow can run for up to 6 hours of execution time. Following, your tests should finish before that or you can split them into multiple jobs, since GitHub workflows can run up to 72 hours. Avoid accessing shared resources when parallelizing test execution to avoid race conditions. Instead create a dedicated resource group per test case i.e., [AzTest](./utils/Test.Utils.psm1) can automatically create and delete a resource group for you:
+
+```powershell
+ It "..." -Tag "..." {
+    AzTest -ResourceGroup {
+        param($ResourceGroup)
+       
+        # ...
+    }
+}
+```
+
+
+### Should we execute the tests to validate a pull request?
+Executing the tests can take a few minutes up to some hours. The long duration is mainly caused by waiting for policy compliance scans and remediations to complete. So while you certainly can execute the tests to validate your pull request, it is not advisable since a pull request should provide your developers feedback in just a couple of minutes to reduce their unproductive waiting time. That being said, executing them as part of your [continuous integration](https://martinfowler.com/articles/continuousIntegration.html) on the main branch is what you should aim for. Alternatively, it might be just good enough to schedule a test run once a day.
 
 ### Why did you assign the policies to subscription and not management group scope?
 Mainly to reduce complexity when explaining the approach and to ease setting it up in your Azure environment. While the approach can easily be scaled towards supporting management groups, the focus lies on testing policies. If you want to learn more about managing Azure at scale, checkout [Enterprise Scale](https://github.com/Azure/Enterprise-Scale).
@@ -640,4 +672,5 @@ You can try to scale towards a more complex management group hierarchy like this
 
 ![Complex management group hierarchy](./docs/azure-management-groups.png)
 
-An idea would be to create an Azure subscription for testing per leaf management group, so referring to the example management group hierarchy: Management, Connectivity, Identity, Corp and Online. For each of this subscriptions you would run a set of tests. The tests are encapsulated in dedicated PowerShell modules per policy, so you could reuse them across subscriptions. While this certainly improves test coverage, it also increases a lot the test duration and complexity. If you are just interested in validating the logic of a single policy, scaling the approach towards a complex management group hierarchy might be overkill.
+An idea would be to create an Azure subscription for testing per leaf management group, so referring to the example management group hierarchy: Management, Connectivity, Identity, Corp and Online. For each of this subscriptions you would run a set of tests. The tests are encapsulated in dedicated PowerShell modules per policy, so you could reuse them across subscriptions. While this certainly improves test coverage by also considering policy layering (See: [Layering policy definitions
+](https://docs.microsoft.com/en-us/azure/governance/policy/concepts/effects#layering-policy-definitions)), it also increases the test duration and complexity a lot. If you are just interested in validating the logic of a single policy, scaling the approach towards a complex management group hierarchy might be overkill.

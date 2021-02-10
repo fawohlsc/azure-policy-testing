@@ -235,65 +235,36 @@ It "Should deny incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "den
 }
 ```
 
-For reusability reasons, the utility methods like ```Invoke-RoutePut``` were moved into dedicated PowerShell Modules (See: [RouteTable.Utils.psm1](./utils/RouteTable.Utils.psm1)):
+For reusability reasons, the utility methods like ```AzTest``` were moved into dedicated PowerShell Modules (See: [Test.Utils.psm1](./utils/Test.Utils.psm1)):
 
 ```powershell
-function Invoke-RoutePut {
+function AzTest {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$Name,
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$AddressPrefix,
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$NextHopType,
+        [ScriptBlock] $Test,
         [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string]$NextHopIpAddress
+        [Switch] $ResourceGroup
     )
 
-    $payload = @"
-{
-    "properties":   {
-        "addressPrefix": "$($AddressPrefix)",
-        "nextHopType": "$($NextHopType)",
-        "nextHopIpAddress": "$($NextHopIpAddress)"
-    }
-}
-"@
-    
-    $httpResponse = Invoke-AzRestMethod `
-        -ResourceGroupName $RouteTable.ResourceGroupName `
-        -ResourceProviderName "Microsoft.Network" `
-        -ResourceType @("routeTables", "routes") `
-        -Name @($RouteTable.Name, $Name) `
-        -ApiVersion "2020-05-01" `
-        -Method "PUT" `
-        -Payload $payload
-
-    # Handling the HTTP status codes returned by the PUT request for route.
-    # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate
-    # Update successful. The operation returns the resulting Route resource.
-    if ($httpResponse.StatusCode -eq 200) {
-        # All good, do nothing.
-    }
-    # Create successful. The operation returns the resulting Route resource.
-    elseif ($httpResponse.StatusCode -eq 201) {
-        # Invoke-AzRestMethod currently does not support awaiting asynchronous operations.
-        # See also: https://github.com/Azure/azure-powershell/issues/13293
-        $asyncOperation = $httpResponse | Wait-AsyncOperation
-        if ($asyncOperation.Status -ne "Succeeded") {
-            throw "Asynchronous operation failed with message: '$($asyncOperation)'"
+    # Retries the test on transient errors.
+    AzRetry {
+        # When a dedicated resource group should be created for the test.
+        if ($ResourceGroup) {
+            try {
+                $resourceGroup = New-ResourceGroupTest
+                Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
+            }
+            finally {
+                # Stops on failures during clean-up. 
+                AzCleanUp {
+                    Remove-AzResourceGroup -Name $ResourceGroup.ResourceGroupName -Force -AsJob
+                }
+            }
         }
-    }
-    # Error response describing why the operation failed.
-    else {
-        throw "Operation failed with message: '$($httpResponse.Content)'"
+        else {
+            Invoke-Command -ScriptBlock $Test
+        }
     }
 }
 ```

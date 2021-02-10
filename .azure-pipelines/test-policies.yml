@@ -1,5 +1,5 @@
 parameters:
-  - name: Reason
+  - name: "Reason"
     displayName: "Reason for triggering the pipeline run"
     type: string
     default: "Testing Azure Policies..."
@@ -47,6 +47,8 @@ steps:
       $credential =  New-Object System.Management.Automation.PSCredential($env:AZURE_SUBSCRIPTION_CLIENT_ID, $password)
       Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser
     displayName: "Login to Azure"
+    env:
+      AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
   - pwsh: |
       Invoke-Pester -Output Detailed -CI
     displayName: "Test Azure Policies"

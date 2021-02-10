@@ -621,7 +621,7 @@ $r = Invoke-Pester -Container $container -PassThru
 ```
 
 ### Is it possible to run the tests under a different user?
-Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you run the tests. Additionally, you can tag and then select the tests by user.
+Yes you can. Just use different ```AZURE_CREDENTIALS``` to login before you run the tests. Additionally, you can tag the tests by user and select them accordingly when running them in your DevOps pipeline or locally.
 
 ```powershell
 It "..." -Tag "user" {
@@ -644,11 +644,11 @@ It "..." -Tag "user" {
 > Do not mix testing Azure Policy and RBAC. If you need to test RBAC e.g., to validate custom roles, create dedicated PowerShell scripts in the [tests](./tests/) folder. This helps you to keep your code clean by separating concerns.
 
 ### Why did you assign the policies to subscription and not management group scope?
-Mainly to reduce complexity when explaining the approach and to ease setting it up in your Azure environment. Another reason is that, the GitHub action *[azure/manage-azure-policy@v0](https://github.com/marketplace/actions/manage-azure-policy)* is still pre-release and does not yet support management groups. While the action can certainly be replaced with some script written in Azure PowerShell, creating policy definitions and assignments is not the main scope of this repository. The focus lies on testing policies. If you want to learn more about managing Azure at scale, checkout [Enterprise Scale](https://github.com/Azure/Enterprise-Scale).
+Mainly to reduce complexity when explaining the approach and to ease setting it up in your Azure environment. While the approach can easily be scaled towards supporting management groups, the focus lies on testing policies. If you want to learn more about managing Azure at scale, checkout [Enterprise Scale](https://github.com/Azure/Enterprise-Scale).
 
 ### Can we scale this testing approach towards a complex management group hierarchy?
 You can try to scale towards a more complex management group hierarchy like this (See: [Enterprise Scale](https://github.com/Azure/Enterprise-Scale/blob/main/docs/reference/adventureworks/README.md)):
 
 ![Complex management group hierarchy](./docs/azure-management-groups.png)
 
-An idea would be to create an Azure subscription for testing per leaf management group, so referring to the example management group hierarchy: Management, Connectivity, Identity, Corp and Online. For each of this subscriptions you would run a set of tests. You might want to encapsulate the tests in dedicated PowerShell modules per policy, so you can reuse them across subscriptions.
+An idea would be to create an Azure subscription for testing per leaf management group, so referring to the example management group hierarchy: Management, Connectivity, Identity, Corp and Online. For each of this subscriptions you would run a set of tests. The tests are encapsulated in dedicated PowerShell modules per policy, so you could reuse them across subscriptions. While this certainly improves test coverage, it also increases a lot the test duration and complexity. If you are just interested in validating the logic of a single policy, scaling the approach towards a complex management group hierarchy might be overkill.

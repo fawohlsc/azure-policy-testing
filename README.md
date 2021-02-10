@@ -564,8 +564,26 @@ Get-ChildItem -Path "./policies" | ForEach-Object {
 
 
 ## FAQ
+### What should we consider when designing a test for a policy?
+There are many different 1st and 3rd party tools to provision resources in Azure e.g. ARM templates, Azure PowerShell, and Terraform. Under the hood, all of them are calling the Azure REST API. Hence, it makes sense to carefully study the [Azure REST API reference](https://docs.microsoft.com/en-us/rest/api/azure/) and [Azure REST API guidelines](https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md). Especially consider:
+- Structure your test cases around Azure REST API calls consider i.e., PUT, PATCH and DELETE requests. 
+- Policies currently do not trigger on DELETE only PUT and PATCH requests. Hence deleted resources can only be remediated asynchronously by using a remediation task.
+- When the [resource provider](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types) does not support PATCH requests, you do not need separate test cases for creating and updating resources since they both result in the same PUT request.
+- Some child resources e.g., [route](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate), can be created standalone or wrapped as inline property of their parent resource e.g., [route table](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate#request-body). Keep that in mind when designing and testing polices e.g., policy [Deny-Route-NextHopVirtualAppliance.json](./policies/Deny-Route-NextHopVirtualAppliance.json) and the corresponding tests [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1).
+- Accessing shared resources during your tests can cause race conditions, e.g. parallel test runs. Consider creating a dedicated resource group per test case to be best practice. [AzTest](./utils/Test.Utils.psm1) can automatically create and delete a resource group for you:
+
+```powershell
+ It "..." -Tag "..." {
+    AzTest -ResourceGroup {
+        param($ResourceGroup)
+       
+        # ...
+    }
+}
+```
+
 ### Should we run the tests to validate a pull request?
-Running the tests can take a few minutes up to some hours. The long duration is mainly caused by waiting for policy compliance scans and remediations to complete. So while you certainly can run the tests to validate your pull request, it is not advisable since a pull request should provide your developers feedback in just a couple of minutes to reduce their unproductive waiting time. That being said, running them as part of your [continuous integration](https://martinfowler.com/articles/continuousIntegration.html) on the main branch is what you should aim for.
+Running the tests can take a few minutes up to some hours. The long duration is mainly caused by waiting for policy compliance scans and remediations to complete. So while you certainly can run the tests to validate your pull request, it is not advisable since a pull request should provide your developers feedback in just a couple of minutes to reduce their unproductive waiting time. That being said, running them as part of your [continuous integration](https://martinfowler.com/articles/continuousIntegration.html) on the main branch is what you should aim for. Alternatively, it might be just good enough to schedule a test run once a day.
 
 ### The tests take a long time to complete, can we speed things up?
 Yes you can try to parallelize the tests. Pester itself currently does not natively support running tests in parallel (See [GitHub Issue #1270](https://github.com/pester/Pester/issues/1270)). What you can achieve this by splitting up the tests in multiple files e.g. by policy and run pester for each file in parallel:

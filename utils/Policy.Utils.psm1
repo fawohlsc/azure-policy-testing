@@ -58,8 +58,8 @@ Starts a remediation for a policy and awaits it's completion. In case of a failu
 .PARAMETER Resource
 The resource to be remediated.
 
-.PARAMETER PolicyAssignmentDisplayName
-The display name of the policy assignment.
+.PARAMETER PolicyDefinitionName
+The name of the policy definition.
 
 .PARAMETER CheckDeployment
 The switch to determine if a deployment is expected. If a deployment is expected but did not happen during policy remediation, the policy remediation is retried.
@@ -77,7 +77,7 @@ function Complete-PolicyRemediation {
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$PolicyAssignmentDisplayName,
+        [string]$PolicyDefinitionName,
         [Parameter()]
         [switch]$CheckDeployment,
         [Parameter()]
@@ -89,12 +89,12 @@ function Complete-PolicyRemediation {
     $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
     $policyAssignmentId = (Get-AzPolicyAssignment -Scope $scope
         | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
-        | Where-Object { $_.DisplayName -eq $PolicyAssignmentDisplayName } 
+        | Where-Object { $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) } 
         | Select-Object -Property PolicyAssignmentId -First 1
     ).PolicyAssignmentId
     
     if ($null -eq $policyAssignmentId) {
-        throw "Policy assignment '$($PolicyAssignmentDisplayName)' was not found at scope '$($scope)'."
+        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($scope)'."
     }
 
     # Remediation might be started before all previous changes on the resource in scope are completed.
@@ -123,13 +123,13 @@ function Complete-PolicyRemediation {
                 }
                 # Failure: No deployment was triggered, so retry when still below maximum retries.
                 elseif ($retries -le $MaxRetries) {
-                    Write-Host "Policy assignment '$($PolicyAssignmentDisplayName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered. Retrying..."
+                    Write-Host "Policy '$($PolicyDefinitionName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered. Retrying..."
                     $retries++
                     continue # Not required, just defensive programming.
                 }
                 # Failure: No deployment was triggered even after maximum retries.
                 else {
-                    throw "Policy assignment '$($PolicyAssignmentDisplayName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
+                    throw "Policy '$($PolicyDefinitionName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
                 }
             }
             # Success: No deployment need to checked, hence no retry required.
@@ -139,13 +139,13 @@ function Complete-PolicyRemediation {
         }
         # Failure: Remediation failed, so retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
-            Write-Host "Policy assignment '$($PolicyAssignmentDisplayName)' failed to remediate resource '$($Resource.Id)'. Retrying..."
+            Write-Host "Policy '$($PolicyDefinitionName)' failed to remediate resource '$($Resource.Id)'. Retrying..."
             $retries++
             continue # Not required, just defensive programming.
         }
         # Failure: Remediation failed even after maximum retries.
         else {
-            throw "Policy assignment '$($PolicyAssignmentDisplayName)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
+            throw "Policy '$($PolicyDefinitionName)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 }

@@ -45,6 +45,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                     -Location $ResourceGroup.Location `
                     -Route $Route
 
+                # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy.
                 $route = Get-RouteNextHopVirtualAppliance -RouteTable $RouteTable
 
                 # Remove-AzRouteConfig/Set-AzRouteTable will issue a PUT request for routeTables and hence policy might kick in.

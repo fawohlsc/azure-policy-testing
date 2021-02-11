@@ -565,7 +565,7 @@ Get-ChildItem -Path "./policies" | ForEach-Object {
 
 7. **Congrats, you are done!** Your feedback is very much appreciated, either by starring this repository, opening a pull request or by raising an issues. Many thanks upfront!
 
-> The setup focuses on GitHub Actions only. For Azure DevOps, you need to create these variables: ```AZURE_SUBSCRIPTION_CLIENT_ID```, ```AZURE_SUBSCRIPTION_CLIENT_SECRET```, ```AZURE_SUBSCRIPTION_ID```, and ```AZURE_SUBSCRIPTION_TENANT_ID```. Create ```AZURE_SUBSCRIPTION_CLIENT_SECRET``` as a secret by selecting the checkbox *Keep this value secret* during variable creation.
+> The setup focuses on GitHub Actions only. For Azure DevOps, you need to create these variables: ```AZURE_SUBSCRIPTION_CLIENT_ID```, ```AZURE_SUBSCRIPTION_CLIENT_SECRET```, ```AZURE_SUBSCRIPTION_ID```, and ```AZURE_SUBSCRIPTION_TENANT_ID```. Make ```AZURE_SUBSCRIPTION_CLIENT_SECRET``` a secret by selecting the checkbox *Keep this value secret* during variable creation.
 
 ## FAQ
 ### What should we consider when designing tests for policies?

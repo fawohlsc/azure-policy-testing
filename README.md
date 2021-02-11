@@ -565,6 +565,7 @@ Get-ChildItem -Path "./policies" | ForEach-Object {
 
 7. **Congrats, you are done!** Your feedback is very much appreciated, either by starring this repository, opening a pull request or by raising an issues. Many thanks upfront!
 
+> The setup focuses on GitHub Actions only. For Azure DevOps, you need to create these variables: *AZURE_SUBSCRIPTION_CLIENT_ID*, *AZURE_SUBSCRIPTION_CLIENT_SECRET*, *AZURE_SUBSCRIPTION_ID*, and *AZURE_SUBSCRIPTION_TENANT_ID*. Create *AZURE_SUBSCRIPTION_CLIENT_SECRET* as a secret by selecting the checkbox *Keep this value secret* during variable creation.
 
 ## FAQ
 ### What should we consider when designing tests for policies?
@@ -572,7 +573,7 @@ There are many different 1st and 3rd party tools to provision resources in Azure
 - Structure your test cases around Azure REST API calls consider i.e., PUT, PATCH and DELETE requests. Basically, any request which can can lead to your resources being incompliant.
 - When the [resource provider](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types) does not support PATCH requests, you do not need separate test cases for creating and updating resources since they both result in the same PUT request.
 - Also consider that some properties are optional, so they might not be sent as part of the PUT requests. You can leverage the [Azure REST API reference](https://docs.microsoft.com/en-us/rest/api/azure/) to check if a property is optional or required. In case the policy alias you are using is referring to an optional property, you should create a dedicated test case to validate the behavior of your policy.
-- Some child resources e.g., [route](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate), can be created standalone or wrapped as inline property and created as part of their their parent resource e.g., [route table](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate#request-body). Keep that in mind when designing and testing polices e.g., policy [Deny-Route-NextHopVirtualAppliance.json](./policies/Deny-Route-NextHopVirtualAppliance.json) and the corresponding tests [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1).
+- Some child resources e.g., [route](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate), can be created standalone or wrapped as inline property and created with their their parent resource e.g., [route table](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate#request-body). Keep that in mind when designing and testing polices e.g., policy [Deny-Route-NextHopVirtualAppliance.json](./policies/Deny-Route-NextHopVirtualAppliance.json) and the corresponding tests [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1).
 - Policies currently do not trigger on DELETE only PUT and PATCH requests. Hence deleted resources can only be remediated asynchronously by using a remediation task.
 - Accessing shared resources during your tests can cause race conditions, e.g. parallel test runs. Consider creating a dedicated resource group per test case to be a best practice. [AzTest](./utils/Test.Utils.psm1) can automatically create and delete a resource group for you:
 
@@ -639,10 +640,10 @@ $r = Invoke-Pester -Container $container -PassThru
 ```
 
 ### The tests take a long time to complete, can we speed things up?
-Pester itself currently does not natively support it (See [GitHub Issue #1270](https://github.com/pester/Pester/issues/1270)), but you can achieve parallelization by invoking Pester multiple times:
+Currently, Pester itself does not natively support it (See [GitHub Issue #1270](https://github.com/pester/Pester/issues/1270)), but you can achieve parallelization by invoking Pester multiple times:
 
 ```powershell
-$job = Get-ChildItem -Path "./tests" -Exclude "*.psm1" 
+$job = Get-ChildItem -Path "./tests" 
 | ForEach-Object -Parallel { 
     Invoke-Pester -Path $_ -Output None -PassThru -CI  
 } -ThrottleLimit 10 -AsJob
@@ -666,12 +667,12 @@ Please consider above as sample code to give you an idea how to parallelize your
 Executing the tests can take a few minutes up to some hours. The long duration is mainly caused by waiting for policy compliance scans and remediations to complete. So while you certainly can execute the tests to validate your pull request, it is not advisable since a pull request should provide your developers feedback in just a couple of minutes to reduce their unproductive waiting time. That being said, executing them as part of your [continuous integration](https://martinfowler.com/articles/continuousIntegration.html) on the main branch is what you should aim for. Alternatively, it might be just good enough to schedule a test run once a day.
 
 ### Why did you assign the policies to subscription and not management group scope?
-Mainly to reduce complexity when explaining the approach and to ease setting it up in your Azure environment. While the approach can easily be scaled towards supporting management groups, the focus lies on testing policies. If you want to learn more about managing Azure at scale, checkout [Enterprise Scale](https://github.com/Azure/Enterprise-Scale).
+Mainly to reduce complexity when explaining the approach and to ease setting it up in your Azure environment. But the approach can easily be scaled towards supporting management groups i.e., by adding support for management groups to [Policy.Utils.psm1](./utils/Policy.Utils.psm1)). If you want to learn more about managing Azure at scale, checkout [Enterprise Scale](https://github.com/Azure/Enterprise-Scale).
 
 ### Can we scale this testing approach towards a complex management group hierarchy?
 You can try to scale towards a more complex management group hierarchy like this (See: [Enterprise Scale](https://github.com/Azure/Enterprise-Scale/blob/main/docs/reference/adventureworks/README.md)):
 
 ![Complex management group hierarchy](./docs/azure-management-groups.png)
 
-An idea would be to create an Azure subscription for testing per leaf management group, so referring to the example management group hierarchy: Management, Connectivity, Identity, Corp and Online. For each of this subscriptions you would run a set of tests. The tests are encapsulated in dedicated PowerShell modules per policy, so you could reuse them across subscriptions. While this certainly improves test coverage by also considering policy layering (See: [Layering policy definitions
-](https://docs.microsoft.com/en-us/azure/governance/policy/concepts/effects#layering-policy-definitions)), it also increases the test duration and complexity a lot. If you are just interested in validating the logic of a single policy, scaling the approach towards a complex management group hierarchy might be overkill.
+An idea would be to create an Azure subscription for testing per leaf management group, so referring to the example management group hierarchy: Management, Connectivity, Identity, Corp and Online. For each of this subscriptions you would run a set of tests. Since each policy is tested by a dedicated PowerShell script, you could reuse them across subscriptions. Also keep in mind that you have to add support for management groups to [Policy.Utils.psm1](./utils/Policy.Utils.psm1)). While scaling towards a complex management group hierarchy certainly improves test coverage by also considering policy layering (See: [Layering policy definitions
+](https://docs.microsoft.com/en-us/azure/governance/policy/concepts/effects#layering-policy-definitions)), it also increases the test duration and complexity a lot. If you are just interested in validating the logic of a single policy, this might be overkill.

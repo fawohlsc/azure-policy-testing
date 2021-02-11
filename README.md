@@ -510,8 +510,8 @@ Before going into the steps to setup this repository with your GitHub account us
 └── utils
 ```
 
-- **.azure-pipelines**: The [Azure YAML pipeline](https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=schema%2Cparameter-schema) creates the policy definitions, assigns them to your subscription and runs the tests.
-- **.github**: The [GitHub Actions workflow](https://github.com/features/actions) creates the policy definitions, assigns them to your subscription and runs the tests.
+- **.azure-pipelines**: Leverage the [Azure YAML pipeline](https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=schema%2Cparameter-schema) when you want to deploy and test policies in your subscription using Azure DevOps.
+- **.github**: Leverage the [GitHub Actions workflow](https://github.com/features/actions) when you want to deploy and test policies in your subscription using GitHub Actions.
 - **docs**: The Markdown files and images used for documentation purposes are placed in this folder, except the **README.md** at the root, which serves as the entry point.
 - **policies**: All the policy definitions and assignments are placed here. Each policy is wrapped in an [ARM template](https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/overview) to ease deployment, e.g.:
 ```powershell
@@ -569,10 +569,11 @@ Get-ChildItem -Path "./policies" | ForEach-Object {
 ## FAQ
 ### What should we consider when designing tests for policies?
 There are many different 1st and 3rd party tools to provision resources in Azure e.g. ARM templates, Azure PowerShell, and Terraform. Under the hood, all of them are calling the Azure REST API. Hence, it makes sense to carefully study the [Azure REST API reference](https://docs.microsoft.com/en-us/rest/api/azure/) and [Azure REST API guidelines](https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md) when designing tests for policies. Especially consider:
-- Structure your test cases around Azure REST API calls consider i.e., PUT, PATCH and DELETE requests. 
-- Policies currently do not trigger on DELETE only PUT and PATCH requests. Hence deleted resources can only be remediated asynchronously by using a remediation task.
+- Structure your test cases around Azure REST API calls consider i.e., PUT, PATCH and DELETE requests. Basically, any request which can can lead to your resources being incompliant.
 - When the [resource provider](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types) does not support PATCH requests, you do not need separate test cases for creating and updating resources since they both result in the same PUT request.
-- Some child resources e.g., [route](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate), can be created standalone or wrapped as inline property of their parent resource e.g., [route table](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate#request-body). Keep that in mind when designing and testing polices e.g., policy [Deny-Route-NextHopVirtualAppliance.json](./policies/Deny-Route-NextHopVirtualAppliance.json) and the corresponding tests [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1).
+- Also consider that some properties are optional, so they might not be sent as part of the PUT requests. You can leverage the [Azure REST API reference](https://docs.microsoft.com/en-us/rest/api/azure/) to check if a property is optional or required. In case the policy aliases you are using are referring to optional properties, you should create dedicated test cases to validate the behavior of your policy.
+- Some child resources e.g., [route](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate), can be created standalone or wrapped as inline property and created as part of their their parent resource e.g., [route table](https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate#request-body). Keep that in mind when designing and testing polices e.g., policy [Deny-Route-NextHopVirtualAppliance.json](./policies/Deny-Route-NextHopVirtualAppliance.json) and the corresponding tests [Deny-Route-NextHopVirtualAppliance.Tests.ps1](./tests/Deny-Route-NextHopVirtualAppliance.Tests.ps1).
+- Policies currently do not trigger on DELETE only PUT and PATCH requests. Hence deleted resources can only be remediated asynchronously by using a remediation task.
 - Accessing shared resources during your tests can cause race conditions, e.g. parallel test runs. Consider creating a dedicated resource group per test case to be a best practice. [AzTest](./utils/Test.Utils.psm1) can automatically create and delete a resource group for you:
 
 ```powershell

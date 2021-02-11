@@ -47,6 +47,8 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
 
                 $route = Get-RouteNextHopVirtualAppliance -RouteTable $RouteTable
 
+                # Remove-AzRouteConfig/Set-AzRouteTable will issue a PUT request for routeTables and hence policy might kick in.
+                # In order to delete the route without policy interfering, directly call the REST API by issuing a DELETE request for route.
                 $routeTable | Invoke-RouteDelete -Route $route
 
                 # Trigger compliance scan for resource group and wait for completion.

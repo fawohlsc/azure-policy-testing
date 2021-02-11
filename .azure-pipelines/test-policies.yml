@@ -13,6 +13,7 @@ trigger:
       - ".github/workflows/**"
       - "policies/**"
       - "tests/**"
+      - "utils/**"
 
 pool:
   vmImage: ubuntu-latest

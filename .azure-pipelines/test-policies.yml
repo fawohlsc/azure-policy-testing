@@ -29,7 +29,7 @@ steps:
   - pwsh: |
       $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
       $credential =  New-Object System.Management.Automation.PSCredential($env:AZURE_SUBSCRIPTION_CLIENT_ID, $password)
-      Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser
+      Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser > $null
     displayName: "Login to Azure"
     env:
       AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)
@@ -48,7 +48,7 @@ steps:
   - pwsh: |
       $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force
       $credential =  New-Object System.Management.Automation.PSCredential($env:AZURE_SUBSCRIPTION_CLIENT_ID, $password)
-      Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser
+      Connect-AzAccount -Subscription $env:AZURE_SUBSCRIPTION_ID -Tenant $env:AZURE_SUBSCRIPTION_TENANT_ID -ServicePrincipal -Credential $credential -Scope CurrentUser > $null
     displayName: "Login to Azure"
     env:
       AZURE_SUBSCRIPTION_CLIENT_SECRET: $(AZURE_SUBSCRIPTION_CLIENT_SECRET)

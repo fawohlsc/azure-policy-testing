@@ -37,6 +37,7 @@ jobs:
           }
       # Logout/Login to Azure to ensure that the latest policies are applied
       - name: Logout of Azure
+        if: false
         shell: pwsh
         run: |
           # Suppress printing out client secret in clear text by sending output to $null.

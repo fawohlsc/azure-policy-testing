@@ -41,7 +41,9 @@ steps:
     workingDirectory: $(Build.SourcesDirectory)
   # Logout/Login to Azure to ensure that the latest policies are applied
   - pwsh: |
-      Disconnect-AzAccount
+      # Suppress printing out client secret in clear text by sending output to $null.
+      # See also: https://github.com/Azure/azure-powershell/issues/14208
+      Disconnect-AzAccount > $null
     displayName: "Logout of Azure"
   - pwsh: |
       $password = ConvertTo-SecureString $env:AZURE_SUBSCRIPTION_CLIENT_SECRET -AsPlainText -Force

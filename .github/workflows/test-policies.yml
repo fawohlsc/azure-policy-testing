@@ -38,7 +38,10 @@ jobs:
       # Logout/Login to Azure to ensure that the latest policies are applied
       - name: Logout of Azure
         shell: pwsh
-        run: Disconnect-AzAccount
+        run: |
+          # Suppress printing out client secret in clear text by sending output to $null.
+          # See also: https://github.com/Azure/azure-powershell/issues/14208
+          Disconnect-AzAccount > $null
       - name: Login to Azure
         uses: azure/login@v1
         with:

@@ -166,12 +166,75 @@ function AzTest {
             finally {
                 # Stops on failures during clean-up. 
                 AzCleanUp {
-                    Remove-AzResourceGroup -Name $ResourceGroup.ResourceGroupName -Force -AsJob
+                    Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
                 }
             }
         }
         else {
             Invoke-Command -ScriptBlock $Test
+        }
+    }
+}
+
+function AzPolicyTest {
+    param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNull()]
+        [ScriptBlock] $Test,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string] $PolicyDefinitionName,
+        [Parameter()]
+        [ValidateNotNull()]
+        [Hashtable] $PolicyParameterObject = @{}
+    )
+
+    # Retries the test on transient errors.
+    AzRetry {
+        try {
+            # Get subscription id
+            $subscriptionId = (Get-AzContext).Subscription.Id
+            
+            # Create dedicated resource group for the test.
+            $resourceGroup = New-ResourceGroupTest
+
+            # Get policy definition.
+            $policyDefinition = Get-AzPolicyDefinition -Name $PolicyDefinitionName
+
+            if ($null -eq $policyDefinition) {
+                throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$($subscriptionId)'."
+            }
+
+            # Assign policy to resource group.
+            if ($policyDefinition.Properties.PolicyRule.then.effect -in "DeployIfNotExists", "Modify") {
+                New-AzPolicyAssignment `
+                    -Name $PolicyDefinitionName `
+                    -PolicyDefinition $policyDefinition `
+                    -PolicyParameterObject $PolicyParameterObject `
+                    -Scope $resourceGroup.ResourceId `
+                    -Location (Get-ResourceLocationDefault) `
+                    -AssignIdentity
+            }
+            else {
+                New-AzPolicyAssignment `
+                    -Name $PolicyDefinitionName `
+                    -PolicyDefinition $policyDefinition `
+                    -PolicyParameterObject $PolicyParameterObject `
+                    -Scope $resourceGroup.ResourceId
+            }
+
+            # Login again to make sure policy assignment is applied.
+            $accessToken = Get-AzAccessToken
+            Connect-AzAccount -AccessToken $accessToken.Token -AccountId $accessToken.UserId -SubscriptionId $subscriptionId > $null
+
+            # Invoke test.
+            Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
+        }
+        finally {
+            # Stops on failures during clean-up. 
+            AzCleanUp {
+                Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
+            }
         }
     }
 }

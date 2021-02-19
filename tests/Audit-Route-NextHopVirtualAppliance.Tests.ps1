@@ -6,12 +6,38 @@ Import-Module "$($PSScriptRoot)/../utils/RouteTable.Utils.psm1" -Force
 Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-route-nexthopvirtualappliance" {
+    BeforeAll {
+        # Suppress breaking change warning in Azure PowerShell
+        # See also: https://github.com/Azure/azure-powershell/blob/master/documentation/breaking-changes/breaking-changes-messages-help.md
+        Set-Item Env:\SuppressAzurePowerShellBreakingChangeWarnings "true"
+
+        function Get-PolicyDefinitionName {
+            return "Audit-Route-NextHopVirtualAppliance";
+        }
+
+        function Get-PolicyParameterObject {
+            return @{
+                "routeTableSettings" = @{
+                    "northeurope" = @{
+                        "virtualApplianceIpAddress" = "10.0.0.23"
+                    }; 
+                    "westeurope"  = @{
+                        "virtualApplianceIpAddress" = "10.1.0.23"
+                    }; 
+                    "disabled"    = @{
+                        "virtualApplianceIpAddress" = ""
+                    }
+                }
+            }
+        }
+    }
+    
     Context "When auditing route tables" {
         It "Should mark route table as compliant with route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-compliant" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
-                # Create compliant route table.
+                # Create compliant route table with route 0.0.0.0/0 pointing to the virtual appliance.
                 $route = New-AzRouteConfig `
                     -Name "default" `
                     -AddressPrefix "0.0.0.0/0" `
@@ -35,22 +61,15 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
         }
 
         It "Should mark route table as incompliant without route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-incompliant" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
-                # Create incompliant route table by deleting route 0.0.0.0/0 pointing to the virtual appliance.
+                # Create incompliant route table without route 0.0.0.0/0 pointing to the virtual appliance.
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
                     -ResourceGroupName $ResourceGroup.ResourceGroupName `
                     -Location $ResourceGroup.Location `
                     -Route $Route
-
-                # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy.
-                $route = Get-RouteNextHopVirtualAppliance -RouteTable $RouteTable
-
-                # Remove-AzRouteConfig/Set-AzRouteTable will issue a PUT request for routeTables and hence policy might kick in.
-                # In order to delete the route without policy interfering, directly call the REST API by issuing a DELETE request for route.
-                $routeTable | Invoke-RouteDelete -Route $route
 
                 # Trigger compliance scan for resource group and wait for completion.
                 $ResourceGroup | Complete-PolicyComplianceScan 

@@ -7,10 +7,6 @@ Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-route-nexthopvirtualappliance" {
     BeforeAll {
-        # Suppress breaking change warning in Azure PowerShell
-        # See also: https://github.com/Azure/azure-powershell/blob/master/documentation/breaking-changes/breaking-changes-messages-help.md
-        Set-Item Env:\SuppressAzurePowerShellBreakingChangeWarnings "true"
-
         function Get-PolicyDefinitionName {
             return "Audit-Route-NextHopVirtualAppliance";
         }

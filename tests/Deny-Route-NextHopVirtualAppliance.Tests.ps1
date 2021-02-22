@@ -6,12 +6,34 @@ Import-Module "$($PSScriptRoot)/../utils/RouteTable.Utils.psm1" -Force
 Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-nexthopvirtualappliance" {
+    BeforeAll {
+        function Get-PolicyDefinitionName {
+            return "Deny-Route-NextHopVirtualAppliance";
+        }
+
+        function Get-PolicyParameterObject {
+            return @{
+                "routeTableSettings" = @{
+                    "northeurope" = @{
+                        "virtualApplianceIpAddress" = "10.0.0.23"
+                    }; 
+                    "westeurope"  = @{
+                        "virtualApplianceIpAddress" = "10.1.0.23"
+                    }; 
+                    "disabled"    = @{
+                        "virtualApplianceIpAddress" = ""
+                    }
+                }
+            }
+        }
+    }
+    
     # Create or update route is actually the same PUT request, hence testing create covers update as well.
     # PATCH requests are currently not supported in Network Resource Provider.
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate
     Context "When route is created or updated" -Tag "deny-route-nexthopvirtualappliance-route-create-update" {
         It "Should deny incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-10" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
                 $routeTable = New-AzRouteTable `
@@ -31,7 +53,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
         }
 
         It "Should deny incompliant route 0.0.0.0/0 with next hop IP address '10.10.10.10'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-20" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
                 $routeTable = New-AzRouteTable `
@@ -52,7 +74,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
         }
 
         It "Should allow compliant route route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-create-update-30" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
                 $routeTable = New-AzRouteTable `
@@ -78,7 +100,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate
     Context "When route table is created or updated" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update" {
         It "Should deny route table containing incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update-10" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
                 # Create route table.
@@ -100,7 +122,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
         }
 
         It "Should deny route table containing incompliant route 0.0.0.0/0 with next hop IP address '10.10.10.10'" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update-20" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
                 # Create route table.
@@ -123,7 +145,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
         }
 
         It "Should allow route table containing compliant route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-routetable-update-30" {
-            AzTest -ResourceGroup {
+            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
                 param($ResourceGroup)
 
                 # Create route table

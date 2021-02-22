@@ -192,20 +192,27 @@ function AzPolicyTest {
     # Retries the test on transient errors.
     AzRetry {
         try {
-            # Get subscription id
-            $subscriptionId = (Get-AzContext).Subscription.Id
+            # Memorize Azure context
+            $context = Get-AzContext
             
-            # Create dedicated resource group for the test.
+            # Check whether policy test is executed using a service principal, which is required to login again after policy assignment.
+            if ($context.Account.Type -ne "ServicePrincipal") {
+                throw "Test for policy '$($PolicyDefinitionName)' has to be executed using a service principal."
+            }
+
+            # Create dedicated resource group for test.
             $resourceGroup = New-ResourceGroupTest
 
             # Get policy definition.
             $policyDefinition = Get-AzPolicyDefinition -Name $PolicyDefinitionName
 
+            # Check whether policy is defined at subscription scope.
             if ($null -eq $policyDefinition) {
-                throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$($subscriptionId)'."
+                throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$($context.Subscription.Id)'."
             }
 
             # Assign policy to resource group.
+            # 'DeployIfNotExists' and 'Modify' policies require assinging a managed identity for remediation.
             if ($policyDefinition.Properties.PolicyRule.then.effect -in "DeployIfNotExists", "Modify") {
                 New-AzPolicyAssignment `
                     -Name $PolicyDefinitionName `
@@ -224,9 +231,10 @@ function AzPolicyTest {
             }
 
             # Login again to make sure policy assignment is applied.
-            $accessToken = Get-AzAccessToken
-            Connect-AzAccount -AccessToken $accessToken.Token -AccountId $accessToken.UserId -SubscriptionId $subscriptionId > $null
-
+            $password = ConvertTo-SecureString $context.Account.ExtendedProperties.ServicePrincipalSecret -AsPlainText -Force
+            $credential = New-Object System.Management.Automation.PSCredential($context.Account.Id, $password)
+            Connect-AzAccount -Tenant $context.Tenant.Id -Subscription $context.Subscription.Id -Credential $credential -ServicePrincipal -Scope Process > $null
+            
             # Invoke test.
             Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
         }

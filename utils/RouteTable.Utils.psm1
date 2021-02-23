@@ -1,7 +1,7 @@
 Import-Module -Name Az.Network
 Import-Module -Name Az.Resources
 Import-Module "$($PSScriptRoot)/Rest.Utils.psm1" -Force
-Import-Module "$($PSScriptRoot)/Test.Utils.psm1" -Force
+Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
 <#
 .SYNOPSIS

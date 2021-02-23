@@ -1,4 +1,5 @@
 Import-Module -Name Az.Resources
+Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
 <#
 .SYNOPSIS
@@ -85,16 +86,18 @@ function Complete-PolicyRemediation {
         [ushort]$MaxRetries = 3
     )
     
+    # Determine resource group where the policy should be assigned to.
+    $resourceGroupId = $Resource.Id -replace "/providers.+", ""
+
     # Determine policy assignment id.
-    $scope = "/subscriptions/$((Get-AzContext).Subscription.Id)"
-    $policyAssignmentId = (Get-AzPolicyAssignment -Scope $scope
+    $policyAssignmentId = (Get-AzPolicyAssignment -Scope $resourceGroupId
         | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
         | Where-Object { $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) } 
         | Select-Object -Property PolicyAssignmentId -First 1
     ).PolicyAssignmentId
     
     if ($null -eq $policyAssignmentId) {
-        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($scope)'."
+        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($resourceGroupId)'."
     }
 
     # Remediation might be started before all previous changes on the resource in scope are completed.
@@ -215,4 +218,105 @@ function Get-PolicyComplianceState {
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 
     return $isCompliant
+}
+
+function New-PolicyAssignment {
+    param (
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNull()]
+        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$PolicyDefinitionName,
+        [Parameter()]
+        [ValidateNotNull()]
+        [Hashtable] $PolicyParameterObject = @{},
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$Location = (Get-ResourceLocationDefault),
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$WaitSeconds = 30,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$MaxRetries = 10
+    )
+
+    # Get policy definition.
+    $policyDefinition = Get-AzPolicyDefinition -Name $PolicyDefinitionName
+
+    # Check whether policy is defined at subscription scope.
+    if ($null -eq $policyDefinition) {
+        throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$((Get-AzContext).Subscription.Id)'."
+    }
+
+    # Assign policy to resource group.
+    # 'DeployIfNotExists' and 'Modify' policies require a managed identity with the appropriated roles for remediation.
+    if ($policyDefinition.Properties.PolicyRule.Then.Effect -in "DeployIfNotExists", "Modify") {
+        # Create policy assignment and managed identity.
+        $policyAssignment = New-AzPolicyAssignment `
+            -Name $PolicyDefinitionName `
+            -DisplayName $PolicyDefinitionName `
+            -PolicyDefinition $policyDefinition `
+            -PolicyParameterObject $PolicyParameterObject `
+            -Scope $ResourceGroup.ResourceId `
+            -Location $Location `
+            -AssignIdentity
+
+        # Assign appropriated roles to managed identity by by directly invoking the Azure REST API.
+        # Using 'New-AzRoleAssignment' would require higher privileges to query Azure Active Directoy.
+        # See also: https://github.com/Azure/azure-powershell/issues/10550#issuecomment-784215221
+        $roleDefinitionIds = $policyDefinition.Properties.PolicyRule.Then.Details.RoleDefinitionIds
+        foreach ($roleDefinitionId in $roleDefinitionIds) {
+            # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
+            # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
+            $retries = 0
+            do {
+                # Wait for Azure Active Directory to replicate managed identity.
+                Start-Sleep -Seconds $WaitSeconds
+
+                $payload = [PSCustomObject]@{ 
+                    properties = [PSCustomObject]@{ 
+                        roleDefinitionId = $roleDefinitionId
+                        principalId      = $policyAssignment.Identity.PrincipalId
+                    }
+                } | ConvertTo-Json
+
+                $httpResponse = Invoke-AzRestMethod `
+                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
+                    -ResourceProviderName "Microsoft.Authorization" `
+                    -ResourceType "roleAssignments" `
+                    -Name (New-Guid).Guid `
+                    -ApiVersion "2015-07-01" `
+                    -Method "PUT" `
+                    -Payload $payload
+
+                # Created - Returns information about the role assignment.
+                if ($httpResponse.StatusCode -eq 201) {
+                    break
+                }
+                # Azure Active Directory did not yet complete replicating the managed identity.
+                elseif (
+                    ($httpResponse.StatusCode -eq 400) -and 
+                    ($httpResponse.Content -like "*PrincipalNotFound*") -and
+                    ($retries -le $MaxRetries)
+                ) {
+                    $retries++
+                    continue # Not required, just defensive programming.
+                }
+                # Error response describing why the operation failed.
+                else {
+                    throw "Operation failed with message: '$($httpResponse.Content)'"
+                }
+            } while ($retries -le $MaxRetries)
+        }
+    }
+    else {
+        # Create policy assignment.
+        New-AzPolicyAssignment `
+            -Name $PolicyDefinitionName `
+            -PolicyDefinition $policyDefinition `
+            -PolicyParameterObject $PolicyParameterObject `
+            -Scope $ResourceGroup.ResourceId
+    }
 }

@@ -1,4 +1,6 @@
 Import-Module -Name Az.Resources
+Import-Module "$($PSScriptRoot)/Policy.Utils.psm1" -Force
+Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
 <#
 .SYNOPSIS
@@ -40,142 +42,6 @@ function AzCleanUp {
     }
 }
 
-<#
-.SYNOPSIS
-Retries the test on transient errors.
-
-.DESCRIPTION
-Retries the script block when a transient errors occurs during test execution.
-
-.PARAMETER Retry
-The script block specifying the test.
-
-.PARAMETER MaxRetries
-The maximum amount of retries in case of transient errors (Default: 3 times).
-
-.EXAMPLE
-AzRetry {
-    # When a dedicated resource group should be created for the test
-    if ($ResourceGroup) {
-        try {
-            $resourceGroup = New-ResourceGroupTest
-            Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
-        }
-        finally {
-            # Stops on failures during clean-up 
-            CleanUp {
-                Remove-AzResourceGroup -Name $ResourceGroup.ResourceGroupName -Force -AsJob
-            }
-        }
-    }
-    else {
-        Invoke-Command -ScriptBlock $Test
-    }
-}
-#>
-function AzRetry {
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [ScriptBlock] $Retry,
-        [Parameter()]
-        [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 3
-    )
-
-    $retries = 0
-    do {
-        try {
-            $Retry.Invoke()
-
-            # Exit loop when no exception was thrown.
-            break
-        }
-        catch {
-            # Determine root cause exception.
-            $innermostException = Get-InnermostException $_.Exception
-           
-            # Rethrow exception when maximum retries are reached.
-            if ($retries -ge $MaxRetries) {
-                throw (New-Object System.Management.Automation.RuntimeException("Test failed even after $($MaxRetries) retries.", $_.Exception))
-            }
-            # Retry when exception is caused by a transient error.
-            elseif ($innermostException -is [System.Threading.Tasks.TaskCanceledException]) {
-                Write-Host "Test failed due to a transient error. Retrying..."
-                $retries++
-                continue
-            }
-            # Rethrow exception when it is caused by a non-transient error.
-            else {
-                throw $_.Exception
-            }
-        }
-    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
-}
-
-<#
-.SYNOPSIS
-Wraps a test targeting Azure.
-
-.DESCRIPTION
-Wraps a test targeting Azure. Also retries the test on transient errors.
-
-.PARAMETER Test
-The script block specifying the test.
-
-.PARAMETER ResourceGroup
-Creates a dedicated resource group for the test, which is automatically cleaned up afterwards.
-
-.EXAMPLE
-AzTest -ResourceGroup {
-    param($ResourceGroup)
-    
-    # Your test code leveraging the resource group, which is automatically cleaned up afterwards.
-}
-
-.EXAMPLE
-AzTest {
-    try {
-        # Your test code
-    }
-    finally {
-        # Don't forget to wrap your clean-up operations in AzCleanUp, otherwise failures during clean-up might remain unnoticed.
-        AzCleanUp {
-            # Your clean-up code
-        }
-    }
-}
-#>
-function AzTest {
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [ScriptBlock] $Test,
-        [Parameter()]
-        [Switch] $ResourceGroup
-    )
-
-    # Retries the test on transient errors.
-    AzRetry {
-        # When a dedicated resource group should be created for the test.
-        if ($ResourceGroup) {
-            try {
-                $resourceGroup = New-ResourceGroupTest
-                Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
-            }
-            finally {
-                # Stops on failures during clean-up. 
-                AzCleanUp {
-                    Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
-                }
-            }
-        }
-        else {
-            Invoke-Command -ScriptBlock $Test
-        }
-    }
-}
-
 function AzPolicyTest {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
@@ -189,133 +55,44 @@ function AzPolicyTest {
         [Hashtable] $PolicyParameterObject = @{}
     )
 
-    # Retries the test on transient errors.
-    AzRetry {
-        try {
-            # Memorize Azure context
-            $context = Get-AzContext
+    try {
+        # Get Azure context
+        $context = Get-AzContext
             
-            # Check whether policy test is executed using a service principal, which is required to login again after policy assignment.
-            if ($context.Account.Type -ne "ServicePrincipal") {
-                throw "Test for policy '$($PolicyDefinitionName)' has to be executed using a service principal."
-            }
-
-            # Create dedicated resource group for test.
-            $resourceGroup = New-ResourceGroupTest
-
-            # Get policy definition.
-            $policyDefinition = Get-AzPolicyDefinition -Name $PolicyDefinitionName
-
-            # Check whether policy is defined at subscription scope.
-            if ($null -eq $policyDefinition) {
-                throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$($context.Subscription.Id)'."
-            }
-
-            # Assign policy to resource group.
-            # 'DeployIfNotExists' and 'Modify' policies require assinging a managed identity for remediation.
-            if ($policyDefinition.Properties.PolicyRule.then.effect -in "DeployIfNotExists", "Modify") {
-                New-AzPolicyAssignment `
-                    -Name $PolicyDefinitionName `
-                    -PolicyDefinition $policyDefinition `
-                    -PolicyParameterObject $PolicyParameterObject `
-                    -Scope $resourceGroup.ResourceId `
-                    -Location (Get-ResourceLocationDefault) `
-                    -AssignIdentity
-            }
-            else {
-                New-AzPolicyAssignment `
-                    -Name $PolicyDefinitionName `
-                    -PolicyDefinition $policyDefinition `
-                    -PolicyParameterObject $PolicyParameterObject `
-                    -Scope $resourceGroup.ResourceId
-            }
-
-            # Login again to make sure policy assignment is applied.
-            $password = ConvertTo-SecureString $context.Account.ExtendedProperties.ServicePrincipalSecret -AsPlainText -Force
-            $credential = New-Object System.Management.Automation.PSCredential($context.Account.Id, $password)
-            Connect-AzAccount -Tenant $context.Tenant.Id -Subscription $context.Subscription.Id -Credential $credential -ServicePrincipal -Scope Process > $null
-            
-            # Invoke test.
-            Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
+        # Check whether test is executed using a service principal, which is required to login again after policy assignment.
+        if ($context.Account.Type -ne "ServicePrincipal") {
+            throw "Test for policy '$($PolicyDefinitionName)' has to be executed using a service principal."
         }
-        finally {
-            # Stops on failures during clean-up. 
-            AzCleanUp {
-                Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
-            }
+
+        # Create resource group for test.
+        $resourceGroup = New-AzResourceGroup `
+            -Name (New-Guid).Guid `
+            -Location (Get-ResourceLocationDefault)
+
+        # Assign policy to resource group.
+        New-PolicyAssignment `
+            -ResourceGroup $resourceGroup `
+            -PolicyDefinitionName $PolicyDefinitionName `
+            -PolicyParameterObject $PolicyParameterObject
+
+        # Login again to make sure policy assignment is applied.
+        $password = ConvertTo-SecureString $context.Account.ExtendedProperties.ServicePrincipalSecret -AsPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($context.Account.Id, $password)
+        Connect-AzAccount `
+            -Tenant $context.Tenant.Id `
+            -Subscription $context.Subscription.Id `
+            -Credential $credential `
+            -ServicePrincipal `
+            -Scope Process `
+            > $null
+            
+        # Invoke test.
+        Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
+    }
+    finally {
+        # Stops on failures during clean-up. 
+        AzCleanUp {
+            Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
         }
     }
-}
-
-<#
-.SYNOPSIS
-Gets the innermost exception.
-
-.DESCRIPTION
-Gets the innermost exception or root cause.
-
-.PARAMETER Exception
-The exception.
-
-.EXAMPLE
-$innermostException = Get-InnermostException $_.Exception
-
-.EXAMPLE
-$innermostException = Get-InnermostException -Exception $_.Exception
-#>
-function Get-InnermostException {
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [System.Exception] $Exception
-    )
-
-    # Innermost exceptions do not have an inner exception.
-    if ($null -eq $Exception.InnerException) {
-        return $Exception
-    }
-    else {
-        return Get-InnermostException $Exception.InnerException
-    }
-}
-
-<#
-.SYNOPSIS
-Gets the default Azure region.
-
-.DESCRIPTION
-Gets the default Azure region, e.g. northeurope.
-
-.EXAMPLE
-$location = Get-ResourceLocationDefault
-#>
-function Get-ResourceLocationDefault {
-    return "northeurope"
-}
-
-<#
-.SYNOPSIS
-Create a dedicated resource group for an automated test case.
-
-.DESCRIPTION
-Create a dedicated resource group for an automated test case. The resource group name will be a GUID to avoid naming collisions.
-
-.PARAMETER Location
-The Azure region where the resource group is created, e.g. northeurope. When no location is provided, the default location is retrieved by using Get-ResourceLocationDefault.
-
-.EXAMPLE
-$resourceGroup = New-ResourceGroupTest
-
-.EXAMPLE
-$resourceGroup = New-ResourceGroupTest -Location "westeurope"
-#>
-function New-ResourceGroupTest {
-    param (
-        [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string]$Location = (Get-ResourceLocationDefault)
-    )
-    
-    $resourceGroup = New-AzResourceGroup -Name (New-Guid).Guid -Location $Location
-    return $resourceGroup
 }

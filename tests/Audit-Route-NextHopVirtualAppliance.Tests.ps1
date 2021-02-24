@@ -14,9 +14,6 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                 "northeurope" = @{
                     "virtualApplianceIpAddress" = "10.0.0.23"
                 }; 
-                "westeurope"  = @{
-                    "virtualApplianceIpAddress" = "10.1.0.23"
-                }; 
                 "disabled"    = @{
                     "virtualApplianceIpAddress" = ""
                 }

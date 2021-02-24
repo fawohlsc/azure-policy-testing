@@ -30,12 +30,12 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
     Context "When route table is created or updated" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update" {
         It "Should add missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update-10" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location
             
                 # Verify that route 0.0.0.0/0 was added by policy.
                 $routeTable
@@ -48,12 +48,12 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
     Context "When route is deleted" -Tag "modify-routetable-nexthopvirtualappliance-route-delete" {
         It "Should remediate missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-route-delete-10" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location
 
                 # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy.
                 $route = Get-RouteNextHopVirtualAppliance -RouteTable $routeTable
@@ -63,7 +63,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                 $routeTable | Invoke-RouteDelete -Route $route
             
                 # Remediate route table by policy and wait for completion.
-                $routeTable | Complete-PolicyRemediation -PolicyDefinitionName (Get-PolicyDefinitionName) -CheckDeployment
+                $routeTable | Complete-PolicyRemediation -PolicyDefinitionName $TestContext.PolicyDefinitionName -CheckDeployment
             
                 # Verify that route 0.0.0.0/0 was added by policy remediation.
                 Get-AzRouteTable -ResourceGroupName $routeTable.ResourceGroupName -Name $routeTable.Name

@@ -31,7 +31,13 @@ function AzPolicyTest {
         Connect-Account
             
         # Invoke the test.
-        Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
+        $testContext = [PSCustomObject]@{ 
+            PolicyDefinitionName  = $PolicyDefinitionName
+            PolicyParameterObject = $PolicyParameterObject
+            ResourceGroup         = $resourceGroup
+        }
+
+        Invoke-Command -ScriptBlock $Test -ArgumentList $testContext
     }
     finally {
         Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob

@@ -30,12 +30,12 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
     Context "When route is created or updated" -Tag "deny-route-nexthopvirtualappliance-route-create-update" {
         It "Should deny incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-10" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location
 
                 # Should be disallowed by policy, so exception should be thrown.
                 {
@@ -44,18 +44,18 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                         -Name "default" `
                         -AddressPrefix "0.0.0.0/0" `
                         -NextHopType "None" # Incompliant.
-                } | Should -Throw "*RequestDisallowedByPolicy*Deny-Route-NextHopVirtualAppliance*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
             }
         }
 
         It "Should deny incompliant route 0.0.0.0/0 with next hop IP address '10.10.10.10'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-20" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location
 
                 # Should be disallowed by policy, so exception should be thrown.
                 {
@@ -65,18 +65,18 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                         -AddressPrefix "0.0.0.0/0" `
                         -NextHopType "VirtualAppliance" `
                         -NextHopIpAddress "10.10.10.10" # Incompliant.
-                } | Should -Throw "*RequestDisallowedByPolicy*Deny-Route-NextHopVirtualAppliance*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
             }
         }
 
         It "Should allow compliant route route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-create-update-30" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location
 
                 # Should be allowed by policy, so no exception should be thrown.
                 {
@@ -97,7 +97,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
     Context "When route table is created or updated" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update" {
         It "Should deny route table containing incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update-10" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 # Create route table.
                 $route = New-AzRouteConfig `
@@ -109,17 +109,17 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                 {
                     New-AzRouteTable `
                         -Name "route-table" `
-                        -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                        -Location $ResourceGroup.Location `
+                        -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                        -Location $TestContext.ResourceGroup.Location `
                         -Route $route `
                         -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
-                } | Should -Throw "*RequestDisallowedByPolicy*Deny-Route-NextHopVirtualAppliance*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
             }
         }
 
         It "Should deny route table containing incompliant route 0.0.0.0/0 with next hop IP address '10.10.10.10'" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update-20" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 # Create route table.
                 $route = New-AzRouteConfig `
@@ -132,31 +132,31 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                 {
                     New-AzRouteTable `
                         -Name "route-table" `
-                        -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                        -Location $ResourceGroup.Location `
+                        -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                        -Location $TestContext.ResourceGroup.Location `
                         -Route $route `
                         -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
-                } | Should -Throw "*RequestDisallowedByPolicy*Deny-Route-NextHopVirtualAppliance*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
             }
         }
 
         It "Should allow route table containing compliant route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-routetable-update-30" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 # Create route table
                 $route = New-AzRouteConfig `
                     -Name "virtual-appliance"  `
                     -AddressPrefix "0.0.0.0/0" `
                     -NextHopType "VirtualAppliance" `
-                    -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $ResourceGroup.Location) # Compliant.
+                    -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $TestContext.ResourceGroup.Location) # Compliant.
             
                 # Should be allowed by policy, so no exception should be thrown.
                 {
                     New-AzRouteTable `
                         -Name "route-table" `
-                        -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                        -Location $ResourceGroup.Location `
+                        -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                        -Location $TestContext.ResourceGroup.Location `
                         -Route $route `
                         -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
                 } | Should -Not -Throw

@@ -27,48 +27,48 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
     Context "When auditing route tables" {
         It "Should mark route table as compliant with route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-compliant" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 # Create compliant route table with route 0.0.0.0/0 pointing to the virtual appliance.
                 $route = New-AzRouteConfig `
                     -Name "default" `
                     -AddressPrefix "0.0.0.0/0" `
                     -NextHopType "VirtualAppliance" `
-                    -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $ResourceGroup.Location)
+                    -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $TestContext.ResourceGroup.Location)
                                 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location `
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location `
                     -Route $Route
 
                 # Trigger compliance scan for resource group and wait for completion.
-                $ResourceGroup | Complete-PolicyComplianceScan 
+                $TestContext.ResourceGroup | Complete-PolicyComplianceScan 
 
                 # Verify that route table is compliant.
                 $routeTable 
-                | Get-PolicyComplianceState -PolicyDefinitionName (Get-PolicyDefinitionName)
+                | Get-PolicyComplianceState -PolicyDefinitionName $TestContext.PolicyDefinitionName
                 | Should -BeTrue
             }
         }
 
         It "Should mark route table as incompliant without route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-incompliant" {
             AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($ResourceGroup)
+                param($TestContext)
 
                 # Create incompliant route table without route 0.0.0.0/0 pointing to the virtual appliance.
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
-                    -Location $ResourceGroup.Location `
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+                    -Location $TestContext.ResourceGroup.Location `
                     -Route $Route
 
                 # Trigger compliance scan for resource group and wait for completion.
-                $ResourceGroup | Complete-PolicyComplianceScan 
+                $TestContext.ResourceGroup | Complete-PolicyComplianceScan 
 
                 # Verify that route table is incompliant.
                 $routeTable 
-                | Get-PolicyComplianceState -PolicyDefinitionName (Get-PolicyDefinitionName)
+                | Get-PolicyComplianceState -PolicyDefinitionName $TestContext.PolicyDefinitionName
                 | Should -BeFalse
             }
         }

@@ -7,22 +7,18 @@ Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-route-nexthopvirtualappliance" {
     BeforeAll {
-        function Get-PolicyDefinitionName {
-            return "Audit-Route-NextHopVirtualAppliance";
-        }
-
-        function Get-PolicyParameterObject {
-            return @{
-                "routeTableSettings" = @{
-                    "northeurope" = @{
-                        "virtualApplianceIpAddress" = "10.0.0.23"
-                    }; 
-                    "westeurope"  = @{
-                        "virtualApplianceIpAddress" = "10.1.0.23"
-                    }; 
-                    "disabled"    = @{
-                        "virtualApplianceIpAddress" = ""
-                    }
+        $script:PolicyDefinitionName = "Audit-Route-NextHopVirtualAppliance"
+        
+        $script:PolicyParameterObject = @{
+            "routeTableSettings" = @{
+                "northeurope" = @{
+                    "virtualApplianceIpAddress" = "10.0.0.23"
+                }; 
+                "westeurope"  = @{
+                    "virtualApplianceIpAddress" = "10.1.0.23"
+                }; 
+                "disabled"    = @{
+                    "virtualApplianceIpAddress" = ""
                 }
             }
         }
@@ -30,7 +26,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
     
     Context "When auditing route tables" {
         It "Should mark route table as compliant with route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-compliant" {
-            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
+            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
                 param($ResourceGroup)
 
                 # Create compliant route table with route 0.0.0.0/0 pointing to the virtual appliance.
@@ -57,7 +53,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
         }
 
         It "Should mark route table as incompliant without route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-incompliant" {
-            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
+            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
                 param($ResourceGroup)
 
                 # Create incompliant route table without route 0.0.0.0/0 pointing to the virtual appliance.

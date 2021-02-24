@@ -110,8 +110,7 @@ function Complete-PolicyRemediation {
         $remediation = $job | Wait-Job | Receive-Job
         
         # Check remediation provisioning state and deployment when required .
-        $succeeded = $remediation.ProvisioningState -eq "Succeeded"
-        if ($succeeded) {
+        if ($remediation.ProvisioningState -eq "Succeeded") {
             if ($CheckDeployment) {
                 $deployed = $remediation.DeploymentSummary.TotalDeployments -gt 0
                 
@@ -271,7 +270,6 @@ function New-PolicyAssignment {
     # Get policy definition.
     $policyDefinition = Get-AzPolicyDefinition -Name $PolicyDefinitionName
 
-    # Check whether policy is defined at subscription scope.
     if ($null -eq $policyDefinition) {
         throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$((Get-AzContext).Subscription.Id)'."
     }

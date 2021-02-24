@@ -7,22 +7,18 @@ Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modify-routetable-nexthopvirtualappliance" {
     BeforeAll {
-        function Get-PolicyDefinitionName {
-            return "Modify-RouteTable-NextHopVirtualAppliance";
-        }
-
-        function Get-PolicyParameterObject {
-            return @{
-                "routeTableSettings" = @{
-                    "northeurope" = @{
-                        "virtualApplianceIpAddress" = "10.0.0.23"
-                    }; 
-                    "westeurope"  = @{
-                        "virtualApplianceIpAddress" = "10.1.0.23"
-                    }; 
-                    "disabled"    = @{
-                        "virtualApplianceIpAddress" = ""
-                    }
+        $script:PolicyDefinitionName = "Modify-RouteTable-NextHopVirtualAppliance"
+        
+        $script:PolicyParameterObject = @{
+            "routeTableSettings" = @{
+                "northeurope" = @{
+                    "virtualApplianceIpAddress" = "10.0.0.23"
+                }; 
+                "westeurope"  = @{
+                    "virtualApplianceIpAddress" = "10.1.0.23"
+                }; 
+                "disabled"    = @{
+                    "virtualApplianceIpAddress" = ""
                 }
             }
         }
@@ -33,7 +29,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate
     Context "When route table is created or updated" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update" {
         It "Should add missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update-10" {
-            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
+            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
                 param($ResourceGroup)
 
                 $routeTable = New-AzRouteTable `
@@ -51,7 +47,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
 
     Context "When route is deleted" -Tag "modify-routetable-nexthopvirtualappliance-route-delete" {
         It "Should remediate missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-route-delete-10" {
-            AzPolicyTest -PolicyDefinitionName (Get-PolicyDefinitionName) -PolicyParameterObject (Get-PolicyParameterObject) {
+            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
                 param($ResourceGroup)
 
                 $routeTable = New-AzRouteTable `

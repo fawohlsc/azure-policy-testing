@@ -2,46 +2,6 @@ Import-Module -Name Az.Resources
 Import-Module "$($PSScriptRoot)/Policy.Utils.psm1" -Force
 Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
-<#
-.SYNOPSIS
-Cleans up any Azure resources created during the test.
-
-.DESCRIPTION
-Cleans up any Azure resources created during the test. If any clean-up operation fails, the whole test will fail.
-
-.PARAMETER CleanUp
-The script block specifying the clean-up operations.
-
-.EXAMPLE
-AzCleanUp {
-    Remove-AzResourceGroup -Name $ResourceGroup.ResourceGroupName -Force
-}
-#>
-function AzCleanUp {
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [ScriptBlock] $CleanUp
-    )
-
-    try {
-        # Remember $ErrorActionPreference.
-        $errorAction = $ErrorActionPreference
-
-        # Stop clean-up on errors, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
-        $ErrorActionPreference = "Stop" 
-
-        # Execute clean-up script.
-        $CleanUp.Invoke()
-
-        # Reset $ErrorActionPreference to previous value.
-        $ErrorActionPreference = $errorAction
-    }
-    catch {
-        throw "Clean-up failed with message: '$($_)'"
-    }
-}
-
 function AzPolicyTest {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
@@ -90,9 +50,6 @@ function AzPolicyTest {
         Invoke-Command -ScriptBlock $Test -ArgumentList $resourceGroup
     }
     finally {
-        # Stops on failures during clean-up. 
-        AzCleanUp {
-            Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
-        }
+        Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
     }
 }

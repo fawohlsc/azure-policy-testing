@@ -6,24 +6,7 @@
         "policyDescription": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
         "policyCategory": "Network",
         // Built-in role 'Network Contributor'.
-        "policyRoleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7",
-        "policyAssignmentName": "[uniqueString(variables('policyName'))]",
-        "policyAssignmentLocation": "northeurope",
-        "policyAssignmentParameters": {
-            "routeTableSettings": {
-                "value": {
-                    "northeurope": {
-                        "virtualApplianceIpAddress": "10.0.0.23"
-                    },
-                    "westeurope": {
-                        "virtualApplianceIpAddress": "10.1.0.23"
-                    },
-                    "disabled": {
-                        "virtualApplianceIpAddress": ""
-                    }
-                }
-            }
-        }
+        "policyRoleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
     },
     "resources": [
         {
@@ -91,42 +74,6 @@
                     }
                 }
             }
-        },
-        {
-            "name": "[variables('policyAssignmentName')]",
-            "type": "Microsoft.Authorization/policyAssignments",
-            "apiVersion": "2020-03-01",
-            "properties": {
-                "displayName": "[variables('policyName')]",
-                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
-                "parameters": "[variables('policyAssignmentParameters')]",
-                "description": "[variables('policyDescription')]",
-                "metadata": {
-                    "category": "[variables('policyCategory')]"
-                },
-                "enforcementMode": "Default"
-            },
-            "location": "[variables('policyAssignmentLocation')]",
-            "identity": {
-                "type": "SystemAssigned"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]"
-            ]
-        },
-        {
-            "name": "[guid(variables('policyAssignmentName'))]",
-            "type": "Microsoft.Authorization/roleAssignments",
-            "apiVersion": "2020-04-01-preview",
-            "properties": {
-                "principalType": "ServicePrincipal",
-                "roleDefinitionId": "[variables('policyRoleDefinitionId')]",
-                // Get the identifier of the managed identity created for the policy assignment.
-                "principalId": "[reference(variables('policyAssignmentName'), '2020-03-01', 'Full').identity.principalId]"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyAssignments', variables('policyAssignmentName'))]"
-            ]
         }
     ]
 }

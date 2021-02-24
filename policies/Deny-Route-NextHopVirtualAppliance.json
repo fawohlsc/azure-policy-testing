@@ -4,22 +4,7 @@
     "variables": {
         "policyName": "Deny-Route-NextHopVirtualAppliance",
         "policyDescription": "Deny route with address prefix 0.0.0.0/0 not pointing to the virtual appliance. Both creating routes as a standalone resource or nested within their parent resource route table are considered.",
-        "policyCategory": "Network",
-        "policyAssignmentParameters": {
-            "routeTableSettings": {
-                "value": {
-                    "northeurope": {
-                        "virtualApplianceIpAddress": "10.0.0.23"
-                    },
-                    "westeurope": {
-                        "virtualApplianceIpAddress": "10.1.0.23"
-                    },
-                    "disabled": {
-                        "virtualApplianceIpAddress": ""
-                    }
-                }
-            }
-        }
+        "policyCategory": "Network"
     },
     "resources": [
         {
@@ -111,24 +96,6 @@
                     }
                 }
             }
-        },
-        {
-            "name": "[uniqueString(variables('policyName'))]",
-            "type": "Microsoft.Authorization/policyAssignments",
-            "apiVersion": "2020-03-01",
-            "properties": {
-                "displayName": "[variables('policyName')]",
-                "policyDefinitionId": "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]",
-                "parameters": "[variables('policyAssignmentParameters')]",
-                "description": "[variables('policyDescription')]",
-                "metadata": {
-                    "category": "[variables('policyCategory')]"
-                },
-                "enforcementMode": "Default"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Authorization/policyDefinitions', variables('policyName'))]"
-            ]
         }
     ]
 }

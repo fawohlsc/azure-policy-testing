@@ -38,7 +38,6 @@ function Complete-PolicyComplianceScan {
         }
         # Failure: Retry policy compliance scan when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
-            Write-Host "Policy compliance scan for resource group '$($ResourceGroup.ResourceId)' failed. Retrying..."
             $retries++
             continue # Not required, just defensive programming.
         }
@@ -122,7 +121,6 @@ function Complete-PolicyRemediation {
                 }
                 # Failure: No deployment was triggered, so retry when still below maximum retries.
                 elseif ($retries -le $MaxRetries) {
-                    Write-Host "Policy '$($PolicyDefinitionName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered. Retrying..."
                     $retries++
                     continue # Not required, just defensive programming.
                 }
@@ -138,7 +136,6 @@ function Complete-PolicyRemediation {
         }
         # Failure: Remediation failed, so retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
-            Write-Host "Policy '$($PolicyDefinitionName)' failed to remediate resource '$($Resource.Id)'. Retrying..."
             $retries++
             continue # Not required, just defensive programming.
         }
@@ -236,7 +233,6 @@ function Get-PolicyComplianceState {
         }
         # Failure: Policy compliance state is null, so wait a few seconds and retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
-            Write-Host "Policy '$($PolicyDefinitionName)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null. Retrying..."
             Start-Sleep -Seconds $WaitSeconds
             $retries++
             continue # Not required, just defensive programming.

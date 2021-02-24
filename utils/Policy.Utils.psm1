@@ -257,9 +257,6 @@ function New-PolicyAssignment {
         [ValidateNotNull()]
         [Hashtable] $PolicyParameterObject = @{},
         [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string]$Location = (Get-ResourceLocationDefault),
-        [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 30,
         [Parameter()]
@@ -284,7 +281,7 @@ function New-PolicyAssignment {
             -PolicyDefinition $policyDefinition `
             -PolicyParameterObject $PolicyParameterObject `
             -Scope $ResourceGroup.ResourceId `
-            -Location $Location `
+            -Location $ResourceGroup.Location `
             -AssignIdentity
 
         # Assign appropriated roles to managed identity by by directly invoking the Azure REST API.

@@ -86,10 +86,10 @@ function Complete-PolicyRemediation {
         [ushort]$MaxRetries = 3
     )
     
-    # Get resource group
+    # Get resource group.
     $resourceGroup = Get-ResourceGroup -Resource $Resource
                 
-    # Get policy assignment
+    # Get policy assignment.
     $policyAssignment = Get-PolicyAssignment -ResourceGroup $resourceGroup -PolicyDefinitionName $PolicyDefinitionName
 
     if ($null -eq $policyAssignment) {
@@ -149,6 +149,29 @@ function Complete-PolicyRemediation {
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 }
 
+function Get-PolicyAssignment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$PolicyDefinitionName
+    )
+
+    # Get policy assignment.
+    $policyAssignment = Get-AzPolicyAssignment -Scope $ResourceGroup.ResourceId
+    | Select-Object -Property * -ExpandProperty Properties 
+    | Where-Object { 
+        # Only policies directly assigned to resource group (not inherited).
+        $_.Scope -eq $ResourceGroup.ResourceId -and
+        $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) 
+    } 
+    | Select-Object -First 1
+
+    return $policyAssignment
+}
+
 <#
 .SYNOPSIS
 Gets the policy compliance state of a resource.
@@ -191,10 +214,10 @@ function Get-PolicyComplianceState {
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
     do {
-        # Get resource group
+        # Get resource group.
         $resourceGroup = Get-ResourceGroup -Resource $Resource
                 
-        # Get policy assignment
+        # Get policy assignment.
         $policyAssignment = Get-PolicyAssignment -ResourceGroup $resourceGroup -PolicyDefinitionName $PolicyDefinitionName
 
         if ($null -eq $policyAssignment) {
@@ -225,25 +248,6 @@ function Get-PolicyComplianceState {
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 
     return $policyState.IsCompliant
-}
-
-function Get-PolicyAssignment {
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNull()]
-        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinitionName
-    )
-
-    # Get policy assignment
-    $policyAssignment = Get-AzPolicyAssignment -Scope $ResourceGroup.ResourceId
-    | Select-Object -Property * -ExpandProperty Properties 
-    | Where-Object { $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) } 
-    | Select-Object -First 1
-
-    return $policyAssignment
 }
 
 function New-PolicyAssignment {

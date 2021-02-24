@@ -86,18 +86,14 @@ function Complete-PolicyRemediation {
         [ushort]$MaxRetries = 3
     )
     
-    # Determine resource group where the policy should be assigned to.
-    $resourceGroupId = $Resource.Id -replace "/providers.+", ""
+    # Get resource group
+    $resourceGroup = Get-ResourceGroup -Resource $Resource
+                
+    # Get policy assignment
+    $policyAssignment = Get-PolicyAssignment -ResourceGroup $resourceGroup -PolicyDefinitionName $PolicyDefinitionName
 
-    # Determine policy assignment id.
-    $policyAssignmentId = (Get-AzPolicyAssignment -Scope $resourceGroupId
-        | Select-Object -Property PolicyAssignmentId -ExpandProperty Properties 
-        | Where-Object { $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) } 
-        | Select-Object -Property PolicyAssignmentId -First 1
-    ).PolicyAssignmentId
-    
-    if ($null -eq $policyAssignmentId) {
-        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($resourceGroupId)'."
+    if ($null -eq $policyAssignment) {
+        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($resourceGroup.ResourceId)'."
     }
 
     # Remediation might be started before all previous changes on the resource in scope are completed.
@@ -109,7 +105,7 @@ function Complete-PolicyRemediation {
         $job = Start-AzPolicyRemediation `
             -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
             -Scope $Resource.Id `
-            -PolicyAssignmentId $policyAssignmentId `
+            -PolicyAssignmentId $policyAssignment.PolicyAssignmentId `
             -ResourceDiscoveryMode ReEvaluateCompliance `
             -AsJob
         $remediation = $job | Wait-Job | Receive-Job
@@ -195,13 +191,24 @@ function Get-PolicyComplianceState {
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
     do {
-        $isCompliant = (Get-AzPolicyState `
-                -PolicyDefinitionName $PolicyDefinitionName `
-                -Filter "ResourceId eq '$($Resource.Id)'" `
-        ).IsCompliant
-        
+        # Get resource group
+        $resourceGroup = Get-ResourceGroup -Resource $Resource
+                
+        # Get policy assignment
+        $policyAssignment = Get-PolicyAssignment -ResourceGroup $resourceGroup -PolicyDefinitionName $PolicyDefinitionName
+
+        if ($null -eq $policyAssignment) {
+            throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($resourceGroup.ResourceId)'."
+        }
+
+        # Get policy state
+        $policyState = Get-AzPolicyState `
+            -ResourceGroupName  $resourceGroup.ResourceGroupName `
+            -PolicyAssignmentName $policyAssignment.Name `
+            -Filter "ResourceId eq '$($Resource.Id)'"
+
         # Success: Policy compliance state is not null.
-        if ($null -ne $isCompliant) {
+        if ($null -ne $policyState.IsCompliant) {
             break
         }
         # Failure: Policy compliance state is null, so wait a few seconds and retry when still below maximum retries.
@@ -217,7 +224,26 @@ function Get-PolicyComplianceState {
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 
-    return $isCompliant
+    return $policyState.IsCompliant
+}
+
+function Get-PolicyAssignment {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$PolicyDefinitionName
+    )
+
+    # Get policy assignment
+    $policyAssignment = Get-AzPolicyAssignment -Scope $ResourceGroup.ResourceId
+    | Select-Object -Property * -ExpandProperty Properties 
+    | Where-Object { $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) } 
+    | Select-Object -First 1
+
+    return $policyAssignment
 }
 
 function New-PolicyAssignment {

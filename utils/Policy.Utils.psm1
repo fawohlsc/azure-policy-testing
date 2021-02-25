@@ -251,8 +251,8 @@ function New-PolicyAssignment {
         [ValidateNotNull()]
         [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
         [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinitionName,
+        [ValidateNotNull()]
+        [PSObject]$PolicyDefinition,
         [Parameter()]
         [ValidateNotNull()]
         [Hashtable] $PolicyParameterObject = @{},
@@ -264,21 +264,13 @@ function New-PolicyAssignment {
         [ushort]$MaxRetries = 10
     )
 
-    # Get policy definition.
-    $policyDefinition = Get-AzPolicyDefinition -Name $PolicyDefinitionName
-
-    if ($null -eq $policyDefinition) {
-        throw "Policy '$($PolicyDefinitionName)' is not defined at scope '/subscriptions/$((Get-AzContext).Subscription.Id)'."
-    }
-
     # Assign policy to resource group.
     # 'DeployIfNotExists' and 'Modify' policies require a managed identity with the appropriated roles for remediation.
-    if ($policyDefinition.Properties.PolicyRule.Then.Effect -in "DeployIfNotExists", "Modify") {
+    if ($PolicyDefinition.Properties.PolicyRule.Then.Effect -in "DeployIfNotExists", "Modify") {
         # Create policy assignment and managed identity.
         $policyAssignment = New-AzPolicyAssignment `
-            -Name $PolicyDefinitionName `
-            -DisplayName $PolicyDefinitionName `
-            -PolicyDefinition $policyDefinition `
+            -Name $PolicyDefinition.Name `
+            -PolicyDefinition $PolicyDefinition `
             -PolicyParameterObject $PolicyParameterObject `
             -Scope $ResourceGroup.ResourceId `
             -Location $ResourceGroup.Location `
@@ -287,7 +279,7 @@ function New-PolicyAssignment {
         # Assign appropriated roles to managed identity by by directly invoking the Azure REST API.
         # Using 'New-AzRoleAssignment' would require higher privileges to query Azure Active Directoy.
         # See also: https://github.com/Azure/azure-powershell/issues/10550#issuecomment-784215221
-        $roleDefinitionIds = $policyDefinition.Properties.PolicyRule.Then.Details.RoleDefinitionIds
+        $roleDefinitionIds = $PolicyDefinition.Properties.PolicyRule.Then.Details.RoleDefinitionIds
         foreach ($roleDefinitionId in $roleDefinitionIds) {
             # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
             # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
@@ -307,7 +299,7 @@ function New-PolicyAssignment {
                     -ResourceGroupName $ResourceGroup.ResourceGroupName `
                     -ResourceProviderName "Microsoft.Authorization" `
                     -ResourceType "roleAssignments" `
-                    -Name (New-Guid).Guid `
+                    -Name $PolicyDefinition.Name `
                     -ApiVersion "2015-07-01" `
                     -Method "PUT" `
                     -Payload $payload
@@ -334,10 +326,88 @@ function New-PolicyAssignment {
     }
     else {
         # Create policy assignment.
-        New-AzPolicyAssignment `
-            -Name $PolicyDefinitionName `
-            -PolicyDefinition $policyDefinition `
+        $policyAssignment = New-AzPolicyAssignment `
+            -Name $PolicyDefinition.Name `
+            -PolicyDefinition $PolicyDefinition `
             -PolicyParameterObject $PolicyParameterObject `
             -Scope $ResourceGroup.ResourceId
     }
+
+    # Re-login to make sure the policy assignment is applied.
+    Connect-Account
+
+    return $policyAssignment
+}
+
+function New-PolicyDefinition {
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [PSObject] $TestContext
+    )
+
+    # The maximum depth allowed for serialization is 100.
+    $depth = 100 
+    
+    # Deserialize the policy template file.
+    $policyTemplate = Get-Content -Path $TestContext.PolicyTemplateFile -Raw | ConvertFrom-Json -Depth $depth
+    
+    # Search for policy definition.
+    $policyDefinitionResource = $policyTemplate.resources 
+    | Where-Object { $_.Type -eq "Microsoft.Authorization/policyDefinitions" } 
+    | Select-Object -Last 1
+
+    if (-not $policyDefinitionResource) {
+        throw "Policy template file '$($testContext.PolicyTemplateFile)' does not contain policy definition resource."
+    }
+
+    # Replace name of the policy definition.
+    $policyDefinitionResource.Name = "$((New-Guid).Guid)"
+    
+    # Create temporary policy template file.
+    $policyTemplateFile = New-TemporaryFile
+    try {
+        # Serialize to temporary policy template file.
+        $policyTemplate | ConvertTo-Json -Depth $depth | Out-File $policyTemplateFile.FullName
+    
+        # Deploy temporary policy template file at subscription scope.
+        $job = New-AzDeployment -templateFile $policyTemplateFile -Location $TestContext.Location -AsJob
+        $deployment = $job | Wait-Job | Receive-Job
+
+        if ($deployment.ProvisioningState -ne "Succeeded") {
+            throw "Policy template file '$($testContext.PolicyTemplateFile)' failed during deployment."
+        }
+    }
+    finally {
+        Remove-Item $policyTemplateFile -Force
+    }
+
+    # Wait to make sure the policy definition is applied.
+    Start-Sleep -Seconds 30
+
+    # Re-login to make sure the policy definition is applied.
+    Connect-Account
+
+    # Get policy definition
+    $policyDefinition = Get-AzPolicyDefinition -Name $policyDefinitionResource.Name
+
+    return $policyDefinition
+}
+
+function Connect-Account {
+    $context = Get-AzContext
+    
+    if ($context.Account.Type -ne "ServicePrincipal") {
+        throw "Re-login requires using a service principal."
+    }
+
+    $password = ConvertTo-SecureString $context.Account.ExtendedProperties.ServicePrincipalSecret -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential($context.Account.Id, $password)
+    Connect-AzAccount `
+        -Tenant $context.Tenant.Id `
+        -Subscription $context.Subscription.Id `
+        -Credential $credential `
+        -ServicePrincipal `
+        -Scope Process `
+        > $null
 }

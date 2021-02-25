@@ -8,56 +8,106 @@ function AzPolicyTest {
         [ValidateNotNull()]
         [ScriptBlock] $Test,
         [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string] $PolicyDefinitionName,
-        [Parameter()]
         [ValidateNotNull()]
-        [Hashtable] $PolicyParameterObject = @{}
+        [PSObject] $TestContext
     )
 
     try {
+        # Generate id
+        $TestContext.Id = "$((New-Guid).Guid)"
+
         # Create resource group for the test.
-        $resourceGroup = New-AzResourceGroup `
-            -Name (New-Guid).Guid `
-            -Location (Get-ResourceLocationDefault)
+        $TestContext.ResourceGroup = New-AzResourceGroup `
+            -Name $TestContext.Id `
+            -Location $TestContext.Location
 
         # Assign policy to the resource group.
-        New-PolicyAssignment `
-            -ResourceGroup $resourceGroup `
-            -PolicyDefinitionName $PolicyDefinitionName `
-            -PolicyParameterObject $PolicyParameterObject
+        $TestContext.PolicyAssignment = New-PolicyAssignment `
+            -ResourceGroup $TestContext.ResourceGroup `
+            -PolicyDefinition $TestContext.PolicyDefinition `
+            -PolicyParameterObject $TestContext.PolicyParameterObject
 
-        # Re-login to make sure the policy assignment is applied.
-        Connect-Account
-            
         # Invoke the test.
-        $testContext = [PSCustomObject]@{ 
-            PolicyDefinitionName  = $PolicyDefinitionName
-            PolicyParameterObject = $PolicyParameterObject
-            ResourceGroup         = $resourceGroup
-        }
-
-        Invoke-Command -ScriptBlock $Test -ArgumentList $testContext
+        Invoke-Command -ScriptBlock $Test
     }
     finally {
-        Remove-AzResourceGroup -Name $resourceGroup.ResourceGroupName -Force -AsJob
+        # Remove policy assignment and resource group.
+        if ($TestContext.PolicyAssignment) {
+            Remove-AzPolicyAssignment -Id $TestContext.PolicyAssignment.ResourceId
+        }
+
+        if ($TestContext.ResourceGroup) {
+            Remove-AzResourceGroup -Id $TestContext.ResourceGroup.ResourceId -Force -AsJob
+        }
     }
 }
 
-function Connect-Account {
-    # Re-login requires using a service principal.
-    $context = Get-AzContext
-    if ($context.Account.Type -ne "ServicePrincipal") {
-        throw "Test for policy '$($PolicyDefinitionName)' has to be executed using a service principal."
+
+function Clear-AzPolicyTest {
+    param (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [PSObject] $TestContext
+    )
+
+    # Remove policy definition.
+    if ($TestContext.PolicyDefinition) {
+        Remove-AzPolicyDefinition -Id $TestContext.PolicyDefinition.ResourceId -Force
+    }
+}
+
+function Initialize-AzPolicyTest {
+    param(
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string] $Policy,
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string] $PolicyTemplateFile,
+        [Parameter()]
+        [ValidateNotNull()]
+        [Hashtable] $PolicyParameterObject = @{},
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [string]$Location = (Get-ResourceLocationDefault)
+    )
+       
+    $testContext = [PSCustomObject]@{ 
+        Id                    = $null
+        Policy                = $null
+        PolicyTemplateFile    = $null
+        PolicyDefinition      = $null
+        PolicyAssignment      = $null
+        PolicyParameterObject = $PolicyParameterObject
+        ResourceGroup         = $null
+        Location              = $Location
     }
 
-    $password = ConvertTo-SecureString $context.Account.ExtendedProperties.ServicePrincipalSecret -AsPlainText -Force
-    $credential = New-Object System.Management.Automation.PSCredential($context.Account.Id, $password)
-    Connect-AzAccount `
-        -Tenant $context.Tenant.Id `
-        -Subscription $context.Subscription.Id `
-        -Credential $credential `
-        -ServicePrincipal `
-        -Scope Process `
-        > $null
+    # Initialize policy.
+    if ($Policy) {
+        $testContext.Policy = $Policy
+    }
+    else {
+        # Determine policy by test file name.
+        $testContext.Policy = (Split-Path $MyInvocation.PSCommandPath -Leaf) -replace ".Tests.ps1", ""
+    }
+
+    # Initialize policy template file.
+    if ($PolicyTemplateFile) {
+        $testContext.PolicyTemplateFile = $PolicyTemplateFile
+    }
+    else {
+        # Determine policy path by test file path.
+        $policyTemplateDirectory = (Get-Item $MyInvocation.PSCommandPath).Directory.Parent.FullName + [IO.Path]::DirectorySeparatorChar + "policies" + [IO.Path]::DirectorySeparatorChar
+        $testContext.PolicyTemplateFile = $policyTemplateDirectory + $testContext.Policy + ".json"
+    }
+
+    if (-not (Test-Path $testContext.PolicyTemplateFile)) {
+        throw "Policy '$($testContext.Policy)' was not found at '$($testContext.PolicyTemplateFile)'."
+    }
+
+    # Create policy definition at subscription scope
+    $testContext.PolicyDefinition = New-PolicyDefinition $testContext
+
+    return $testContext
 }

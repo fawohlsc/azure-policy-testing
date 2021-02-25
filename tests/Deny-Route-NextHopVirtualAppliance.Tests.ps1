@@ -7,9 +7,8 @@ Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-nexthopvirtualappliance" {
     BeforeAll {
-        $script:PolicyDefinitionName = "Deny-Route-NextHopVirtualAppliance"
-        
-        $script:PolicyParameterObject = @{
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $TestContext = Initialize-AzPolicyTest -PolicyParameterObject @{
             "routeTableSettings" = @{
                 "northeurope" = @{
                     "virtualApplianceIpAddress" = "10.0.0.23"
@@ -26,9 +25,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routes/createorupdate
     Context "When route is created or updated" -Tag "deny-route-nexthopvirtualappliance-route-create-update" {
         It "Should deny incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-10" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
                     -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
@@ -41,14 +38,12 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                         -Name "default" `
                         -AddressPrefix "0.0.0.0/0" `
                         -NextHopType "None" # Incompliant.
-                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinition.Name)*"
             }
         }
 
         It "Should deny incompliant route 0.0.0.0/0 with next hop IP address '10.10.10.10'" -Tag "deny-route-nexthopvirtualappliance-route-create-update-20" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
                     -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
@@ -62,14 +57,12 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                         -AddressPrefix "0.0.0.0/0" `
                         -NextHopType "VirtualAppliance" `
                         -NextHopIpAddress "10.10.10.10" # Incompliant.
-                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinition.Name)*"
             }
         }
 
         It "Should allow compliant route route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-create-update-30" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
                     -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
@@ -93,9 +86,7 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate
     Context "When route table is created or updated" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update" {
         It "Should deny route table containing incompliant route 0.0.0.0/0 with next hop type 'None'" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update-10" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 # Create route table.
                 $route = New-AzRouteConfig `
                     -Name "virtual-appliance"  `
@@ -110,14 +101,12 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                         -Location $TestContext.ResourceGroup.Location `
                         -Route $route `
                         -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
-                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinition.Name)*"
             }
         }
 
         It "Should deny route table containing incompliant route 0.0.0.0/0 with next hop IP address '10.10.10.10'" -Tag "deny-route-nexthopvirtualappliance-routetable-create-update-20" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 # Create route table.
                 $route = New-AzRouteConfig `
                     -Name "virtual-appliance"  `
@@ -133,14 +122,12 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                         -Location $TestContext.ResourceGroup.Location `
                         -Route $route `
                         -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
-                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinitionName)*"
+                } | Should -Throw "*RequestDisallowedByPolicy*$($TestContext.PolicyDefinition.Name)*"
             }
         }
 
         It "Should allow route table containing compliant route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-routetable-update-30" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 # Create route table
                 $route = New-AzRouteConfig `
                     -Name "virtual-appliance"  `
@@ -159,5 +146,9 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                 } | Should -Not -Throw
             }
         }
+    }
+
+    AfterAll {
+        Clear-AzPolicyTest -TestContext $TestContext
     }
 }

@@ -32,8 +32,10 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                     -Location $TestContext.ResourceGroup.Location
             
                 # Verify that route 0.0.0.0/0 was added by policy.
-                Get-RouteNextHopVirtualAppliance -RouteTable $routeTable -TestContext $TestContext
-                | Should -Not -BeNullOrEmpty
+                $route = Get-Route -RouteTable $routeTable -AddressPrefix "0.0.0.0/0"
+                $route | Should -Not -BeNullOrEmpty
+                $route.NextHopType | Should -Be "VirtualAppliance"
+                $route.NextHopIpAddress | Should -Be $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
             }
         }
     }
@@ -47,7 +49,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                     -Location $TestContext.ResourceGroup.Location
 
                 # Get route 0.0.0.0/0 pointing to the virtual appliance, which was added by policy.
-                $route = Get-RouteNextHopVirtualAppliance -RouteTable $routeTable
+                $route = Get-Route -RouteTable $routeTable -AddressPrefix "0.0.0.0/0"
 
                 # Remove-AzRouteConfig/Set-AzRouteTable will issue a PUT request for routeTables and hence policy might kick in.
                 # In order to delete the route without policy interfering, directly call the REST API by issuing a DELETE request for route.
@@ -57,8 +59,10 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                 $routeTable | Complete-PolicyRemediation -TestContext $TestContext -CheckDeployment
             
                 # Verify that route 0.0.0.0/0 was added by policy remediation.
-                Get-RouteNextHopVirtualAppliance -RouteTable $routeTable -TestContext $TestContext
-                | Should -Not -BeNullOrEmpty
+                $route = Get-Route -RouteTable $routeTable -AddressPrefix "0.0.0.0/0"
+                $route | Should -Not -BeNullOrEmpty
+                $route.NextHopType | Should -Be "VirtualAppliance"
+                $route.NextHopIpAddress | Should -Be $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
             }
         }
     }

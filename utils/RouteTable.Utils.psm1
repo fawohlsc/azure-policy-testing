@@ -2,38 +2,18 @@ Import-Module -Name Az.Network
 Import-Module -Name Az.Resources
 Import-Module "$($PSScriptRoot)/Rest.Utils.psm1" -Force
 
-<#
-.SYNOPSIS
-Gets route 0.0.0.0/0 pointing to the virtual appliance.
-
-.DESCRIPTION
-Gets route 0.0.0.0/0 pointing to the virtual appliance which is provisioned as part of the landing zone.
-
-.PARAMETER RouteTable
-The route table containing the route 0.0.0.0/0 pointing to the virtual appliance.
-
-.EXAMPLE
-$route = $RouteTable | Get-RouteNextHopVirtualAppliance 
-
-.EXAMPLE
-$route = Get-RouteNextHopVirtualAppliance -RouteTable $routeTable
-#>
-function Get-RouteNextHopVirtualAppliance {
+function Get-Route {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
         [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
         [Parameter(Mandatory = $true)]
-        [ValidateNotNull()]
-        [PSObject] $TestContext
+        [ValidateNotNullOrEmpty()]
+        [string]$AddressPrefix
     )
     
-    $nextHopIpAddress = $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
-    
     $route = $RouteTable.Routes | Where-Object { 
-        ($_.AddressPrefix -eq "0.0.0.0/0") -and
-        ($_.NextHopType -eq "VirtualAppliance") -and
-        ($_.NextHopIpAddress -eq $nextHopIpAddress)
+        $_.AddressPrefix -eq $AddressPrefix
     } | Select-Object -First 1 # Address prefixes are unique within a route table.
 
     return $route

@@ -1,7 +1,6 @@
 Import-Module -Name Az.Network
 Import-Module -Name Az.Resources
 Import-Module "$($PSScriptRoot)/Rest.Utils.psm1" -Force
-Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
 <#
 .SYNOPSIS
@@ -21,12 +20,15 @@ $route = Get-RouteNextHopVirtualAppliance -RouteTable $routeTable
 #>
 function Get-RouteNextHopVirtualAppliance {
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable
+        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [PSObject] $TestContext
     )
     
-    $nextHopIpAddress = Get-VirtualApplianceIpAddress -Location $RouteTable.Location
+    $nextHopIpAddress = $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
     
     $route = $RouteTable.Routes | Where-Object { 
         ($_.AddressPrefix -eq "0.0.0.0/0") -and
@@ -35,39 +37,6 @@ function Get-RouteNextHopVirtualAppliance {
     } | Select-Object -First 1 # Address prefixes are unique within a route table.
 
     return $route
-}
-
-<#
-.SYNOPSIS
-Gets the IP address of the virtual appliance.
-
-.DESCRIPTION
-Gets the IP address of the virtual appliance for the respective Azure region. The test environment is based on a hub/spoke network topology, with a virtual appliance deployed in each hub and each hub provisioned per Azure region. When no location is provided, the default location is retrieved by using Get-ResourceLocationDefault.
-
-.PARAMETER Location
-The Azure region where the virtual appliance is deployed to, e.g. northeurope. 
-
-.EXAMPLE
-$nextHopIpAddress = Get-VirtualApplianceIpAddress -Location $RouteTable.Location
-
-.EXAMPLE
-$nextHopIpAddress = Get-VirtualApplianceIpAddress
-#>
-function Get-VirtualApplianceIpAddress {
-    param (
-        [Parameter()]
-        [ValidateNotNullOrEmpty()]
-        [string]$Location = (Get-ResourceLocationDefault)
-    )
-
-    $virtualApplianceIpAddress > $null
-    switch ($Location) {
-        "northeurope" { $virtualApplianceIpAddress = "10.0.0.23"; break }
-        "westeurope" { $virtualApplianceIpAddress = "10.1.0.23"; break }
-        default { throw "Location '$($Location)' not handled." }
-    }
-
-    return $virtualApplianceIpAddress
 }
 
 <#
@@ -217,29 +186,4 @@ function Invoke-RoutePut {
     else {
         throw "Operation failed with message: '$($httpResponse.Content)'"
     }
-}
-
-<#
-.SYNOPSIS
-Tests whether a route table contains the route 0.0.0.0/0 pointing to the virtual appliance.
-
-.DESCRIPTION
-Tests whether a route table contains the route 0.0.0.0/0 pointing to the virtual appliance, which is provisioned as part of the landing zone.
-
-.PARAMETER RouteTable
-The route table to be tested.
-
-.EXAMPLE
-$routeTable | Test-RouteNextHopVirtualAppliance | Should -BeTrue
-#>
-function Test-RouteNextHopVirtualAppliance {
-    param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable
-    )
-    
-    $route = Get-RouteNextHopVirtualAppliance -RouteTable $RouteTable
-
-    return $null -ne $route
 }

@@ -32,9 +32,8 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                     -Location $TestContext.ResourceGroup.Location
             
                 # Verify that route 0.0.0.0/0 was added by policy.
-                $routeTable
-                | Test-RouteNextHopVirtualAppliance
-                | Should -BeTrue
+                Get-RouteNextHopVirtualAppliance -RouteTable $routeTable -TestContext $TestContext
+                | Should -Not -BeNullOrEmpty
             }
         }
     }
@@ -58,9 +57,8 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
                 $routeTable | Complete-PolicyRemediation -PolicyDefinitionName $TestContext.PolicyDefinitionName -CheckDeployment
             
                 # Verify that route 0.0.0.0/0 was added by policy remediation.
-                Get-AzRouteTable -ResourceGroupName $routeTable.ResourceGroupName -Name $routeTable.Name
-                | Test-RouteNextHopVirtualAppliance
-                | Should -BeTrue
+                Get-RouteNextHopVirtualAppliance -RouteTable $routeTable -TestContext $TestContext
+                | Should -Not -BeNullOrEmpty
             }
         }
     }

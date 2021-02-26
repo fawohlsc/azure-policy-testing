@@ -1,6 +1,5 @@
 Import-Module -Name Az.Resources
 Import-Module "$($PSScriptRoot)/Policy.Utils.psm1" -Force
-Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
 function AzPolicyTest {
     param (

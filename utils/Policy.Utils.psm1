@@ -1,5 +1,4 @@
 Import-Module -Name Az.Resources
-Import-Module "$($PSScriptRoot)/Resource.Utils.psm1" -Force
 
 <#
 .SYNOPSIS

@@ -299,12 +299,15 @@ function New-PolicyDefinition {
     # The maximum depth allowed for serialization is 100.
     $depth = 100 
     
-    # Deserialize the policy template file.
-    $policyTemplate = Get-Content -Path $TestContext.PolicyTemplateFile -Raw | ConvertFrom-Json -Depth $depth
+    # Deserialize the template file.
+    $template = Get-Content -Path $TestContext.PolicyTemplateFile -Raw | ConvertFrom-Json -Depth $depth
     
+    # Change template schema to subscription deployment template.
+    $template.'$schema' = "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#"
+
     # Search for policy definition.
-    $policyDefinitionResource = $policyTemplate.resources 
-    | Where-Object { $_.Type -eq "Microsoft.Authorization/policyDefinitions" } 
+    $policyDefinitionResource = $template.resources 
+    | Where-Object { $_.type -eq "Microsoft.Authorization/policyDefinitions" } 
     | Select-Object -Last 1
 
     if (-not $policyDefinitionResource) {
@@ -312,16 +315,16 @@ function New-PolicyDefinition {
     }
 
     # Replace name of the policy definition.
-    $policyDefinitionResource.Name = "$((New-Guid).Guid)"
+    $policyDefinitionResource.name = "$((New-Guid).Guid)"
     
     # Create temporary policy template file.
-    $policyTemplateFile = New-TemporaryFile
+    $templateFile = New-TemporaryFile
     try {
         # Serialize to temporary policy template file.
-        $policyTemplate | ConvertTo-Json -Depth $depth | Out-File $policyTemplateFile.FullName
+        $template | ConvertTo-Json -Depth $depth | Out-File $templateFile.FullName
     
         # Deploy temporary policy template file at subscription scope.
-        $job = New-AzDeployment -templateFile $policyTemplateFile -Location $TestContext.Location -AsJob
+        $job = New-AzDeployment -templateFile $templateFile -Location $TestContext.Location -AsJob
         $deployment = $job | Wait-Job | Receive-Job
 
         if ($deployment.ProvisioningState -ne "Succeeded") {
@@ -329,7 +332,7 @@ function New-PolicyDefinition {
         }
     }
     finally {
-        Remove-Item $policyTemplateFile -Force
+        Remove-Item $templateFile -Force
     }
 
     # Wait to make sure the policy definition is applied.

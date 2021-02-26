@@ -71,12 +71,11 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
                 # Should be allowed by policy, so no exception should be thrown.
                 {
                     # Directly calling REST API with PUT routes, since New-AzRouteConfig/Set-AzRouteTable will issue PUT routeTables.
-                    $nextHopIpAddress = $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
                     $routeTable | Invoke-RoutePut `
                         -Name "default" `
                         -AddressPrefix "0.0.0.0/0" `
                         -NextHopType "VirtualAppliance" `
-                        -NextHopIpAddress $nextHopIpAddress # Compliant.
+                        -NextHopIpAddress $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress # Compliant.
                 } | Should -Not -Throw
             }
         }
@@ -127,12 +126,11 @@ Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-
 
         It "Should allow route table containing compliant route 0.0.0.0/0" -Tag "deny-route-nexthopvirtualappliance-route-routetable-update-30" {
             AzPolicyTest -TestContext $TestContext {
-                $nextHopIpAddress = $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
                 $route = New-AzRouteConfig `
                     -Name "virtual-appliance"  `
                     -AddressPrefix "0.0.0.0/0" `
                     -NextHopType "VirtualAppliance" `
-                    -NextHopIpAddress $nextHopIpAddress # Compliant.
+                    -NextHopIpAddress $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress # Compliant.
             
                 # Should be allowed by policy, so no exception should be thrown.
                 {

@@ -24,13 +24,11 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
         It "Should mark route table as compliant with route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-compliant" {
             AzPolicyTest -TestContext $TestContext {
                 # Create compliant route table with route 0.0.0.0/0 pointing to the virtual appliance.
-                $nextHopIpAddress = $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
-                
                 $route = New-AzRouteConfig `
                     -Name "default" `
                     -AddressPrefix "0.0.0.0/0" `
                     -NextHopType "VirtualAppliance" `
-                    -NextHopIpAddress $nextHopIpAddress
+                    -NextHopIpAddress $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
                                 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `

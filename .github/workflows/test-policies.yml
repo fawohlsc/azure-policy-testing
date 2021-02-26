@@ -29,24 +29,6 @@ jobs:
         with:
           creds: ${{secrets.AZURE_CREDENTIALS}}
           enable-AzPSSession: true
-      - name: Create or update Azure Policies
-        shell: pwsh
-        run: |
-          Get-ChildItem -Path "./policies" | ForEach-Object {
-            New-AzDeployment -Location "northeurope" -TemplateFile $_.FullName
-          }
-      # Logout/Login to Azure to ensure that the latest policies are applied
-      - name: Logout of Azure
-        shell: pwsh
-        run: |
-          # Suppress printing out client secret in clear text by sending output to $null.
-          # See also: https://github.com/Azure/azure-powershell/issues/14208
-          Disconnect-AzAccount > $null
-      - name: Login to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{secrets.AZURE_CREDENTIALS}}
-          enable-AzPSSession: true
       - name: Test Azure Policies
         shell: pwsh
         run: |

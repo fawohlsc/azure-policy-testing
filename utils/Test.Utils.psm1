@@ -23,7 +23,7 @@ function AzPolicyTest {
         # Assign policy to the resource group.
         $TestContext.PolicyAssignment = New-PolicyAssignment $testContext
 
-        # Invoke the test.
+        # Execute the test.
         Invoke-Command -ScriptBlock $Test
     }
     finally {

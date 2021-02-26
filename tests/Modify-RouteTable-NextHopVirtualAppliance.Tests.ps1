@@ -7,6 +7,7 @@ Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modify-routetable-nexthopvirtualappliance" {
     BeforeAll {
+        # Before all tests, initialize the test context and create an unique policy definition at subscription scope.
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $TestContext = Initialize-AzPolicyTest -PolicyParameterObject @{
             "routeTableSettings" = @{
@@ -25,6 +26,8 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
     # See also: https://docs.microsoft.com/en-us/rest/api/virtualnetwork/routetables/createorupdate
     Context "When route table is created or updated" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update" {
         It "Should add missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-routetable-create-update-10" {
+            # Create an unique resource group, assign the policy to the resource group and execute the test.
+            # After executing the test, the policy assignment and resource group will be deleted.
             AzPolicyTest -TestContext $TestContext {
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
@@ -42,6 +45,8 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
 
     Context "When route is deleted" -Tag "modify-routetable-nexthopvirtualappliance-route-delete" {
         It "Should remediate missing route 0.0.0.0/0 pointing to the virtual appliance" -Tag "modify-routetable-nexthopvirtualappliance-route-delete-10" {
+            # Create an unique resource group, assign the policy to the resource group and execute the test.
+            # After executing the test, the policy assignment and resource group will be deleted.
             AzPolicyTest -TestContext $TestContext {
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
@@ -68,6 +73,7 @@ Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modi
     }
 
     AfterAll {
+        # After all tests, delete the unique policy definition at subscription scope.
         Clear-AzPolicyTest -TestContext $TestContext
     }
 }

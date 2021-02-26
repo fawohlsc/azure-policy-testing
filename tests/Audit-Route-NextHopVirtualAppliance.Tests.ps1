@@ -7,9 +7,8 @@ Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
 
 Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-route-nexthopvirtualappliance" {
     BeforeAll {
-        $script:PolicyDefinitionName = "Audit-Route-NextHopVirtualAppliance"
-        
-        $script:PolicyParameterObject = @{
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
+        $TestContext = Initialize-AzPolicyTest -PolicyParameterObject @{
             "routeTableSettings" = @{
                 "northeurope" = @{
                     "virtualApplianceIpAddress" = "10.0.0.23"
@@ -23,15 +22,15 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
     
     Context "When auditing route tables" {
         It "Should mark route table as compliant with route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-compliant" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 # Create compliant route table with route 0.0.0.0/0 pointing to the virtual appliance.
+                $nextHopIpAddress = $TestContext.PolicyParameterObject.routeTableSettings.northeurope.virtualApplianceIpAddress
+                
                 $route = New-AzRouteConfig `
                     -Name "default" `
                     -AddressPrefix "0.0.0.0/0" `
                     -NextHopType "VirtualAppliance" `
-                    -NextHopIpAddress (Get-VirtualApplianceIpAddress -Location $TestContext.ResourceGroup.Location)
+                    -NextHopIpAddress $nextHopIpAddress
                                 
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
@@ -40,19 +39,18 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                     -Route $Route
 
                 # Trigger compliance scan for resource group and wait for completion.
-                $TestContext.ResourceGroup | Complete-PolicyComplianceScan 
+                Complete-PolicyComplianceScan -TestContext $TestContext 
 
                 # Verify that route table is compliant.
-                $routeTable 
-                | Get-PolicyComplianceState -PolicyDefinitionName $TestContext.PolicyDefinitionName
+                Get-PolicyComplianceState `
+                    -Resource $routeTable `
+                    -TestContext $TestContext
                 | Should -BeTrue
             }
         }
 
         It "Should mark route table as incompliant without route 0.0.0.0/0 pointing to virtual appliance." -Tag "audit-route-nexthopvirtualappliance-incompliant" {
-            AzPolicyTest -PolicyDefinitionName $script:PolicyDefinitionName -PolicyParameterObject $script:PolicyParameterObject {
-                param($TestContext)
-
+            AzPolicyTest -TestContext $TestContext {
                 # Create incompliant route table without route 0.0.0.0/0 pointing to the virtual appliance.
                 $routeTable = New-AzRouteTable `
                     -Name "route-table" `
@@ -61,13 +59,18 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                     -Route $Route
 
                 # Trigger compliance scan for resource group and wait for completion.
-                $TestContext.ResourceGroup | Complete-PolicyComplianceScan 
+                Complete-PolicyComplianceScan -TestContext $TestContext 
 
                 # Verify that route table is incompliant.
-                $routeTable 
-                | Get-PolicyComplianceState -PolicyDefinitionName $TestContext.PolicyDefinitionName
+                Get-PolicyComplianceState `
+                    -Resource $routeTable `
+                    -TestContext $TestContext
                 | Should -BeFalse
             }
         }
+    }
+
+    AfterAll {
+        Clear-AzPolicyTest -TestContext $TestContext
     }
 }

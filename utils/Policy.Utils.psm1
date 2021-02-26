@@ -19,9 +19,9 @@ $ResourceGroup | Complete-PolicyComplianceScan
 #>
 function Complete-PolicyComplianceScan {
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
+        [PSObject] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$MaxRetries = 3
@@ -30,7 +30,7 @@ function Complete-PolicyComplianceScan {
     # Policy compliance scan might fail, hence retrying to avoid flaky tests.
     $retries = 0
     do {
-        $job = Start-AzPolicyComplianceScan -ResourceGroupName $ResourceGroup.ResourceGroupName -PassThru -AsJob 
+        $job = Start-AzPolicyComplianceScan -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName -PassThru -AsJob 
         $succeeded = $job | Wait-Job | Receive-Job
         
         if ($succeeded) {
@@ -43,7 +43,7 @@ function Complete-PolicyComplianceScan {
         }
         # Failure: Policy compliance scan is still failing after maximum retries.
         else {
-            throw "Policy compliance scan for resource group '$($ResourceGroup.ResourceId)' failed even after $($MaxRetries) retries."
+            throw "Policy compliance scan for resource group '$($TestContext.ResourceGroup.ResourceId)' failed even after $($MaxRetries) retries."
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 }
@@ -76,8 +76,8 @@ function Complete-PolicyRemediation {
         [ValidateNotNull()]
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinitionName,
+        [ValidateNotNull()]
+        [PSObject] $TestContext,
         [Parameter()]
         [switch]$CheckDeployment,
         [Parameter()]
@@ -85,16 +85,6 @@ function Complete-PolicyRemediation {
         [ushort]$MaxRetries = 3
     )
     
-    # Get resource group.
-    $resourceGroup = Get-ResourceGroup -Resource $Resource
-                
-    # Get policy assignment.
-    $policyAssignment = Get-PolicyAssignment -ResourceGroup $resourceGroup -PolicyDefinitionName $PolicyDefinitionName
-
-    if ($null -eq $policyAssignment) {
-        throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($resourceGroup.ResourceId)'."
-    }
-
     # Remediation might be started before all previous changes on the resource in scope are completed.
     # This race condition could lead to a successful remediation without any deployment being triggered.
     # When a deployment is expected, it might be required to retry remediation to avoid flaky tests.
@@ -104,7 +94,7 @@ function Complete-PolicyRemediation {
         $job = Start-AzPolicyRemediation `
             -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
             -Scope $Resource.Id `
-            -PolicyAssignmentId $policyAssignment.PolicyAssignmentId `
+            -PolicyAssignmentId $TestContext.PolicyAssignment.PolicyAssignmentId `
             -ResourceDiscoveryMode ReEvaluateCompliance `
             -AsJob
         $remediation = $job | Wait-Job | Receive-Job
@@ -125,7 +115,7 @@ function Complete-PolicyRemediation {
                 }
                 # Failure: No deployment was triggered even after maximum retries.
                 else {
-                    throw "Policy '$($PolicyDefinitionName)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
+                    throw "Policy '$($TestContext.Policy)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
                 }
             }
             # Success: No deployment need to checked, hence no retry required.
@@ -140,32 +130,9 @@ function Complete-PolicyRemediation {
         }
         # Failure: Remediation failed even after maximum retries.
         else {
-            throw "Policy '$($PolicyDefinitionName)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
+            throw "Policy '$($TestContext.Policy)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
-}
-
-function Get-PolicyAssignment {
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNull()]
-        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinitionName
-    )
-
-    # Get policy assignment.
-    $policyAssignment = Get-AzPolicyAssignment -Scope $ResourceGroup.ResourceId
-    | Select-Object -Property * -ExpandProperty Properties 
-    | Where-Object { 
-        # Only policies directly assigned to resource group (not inherited).
-        $_.Scope -eq $ResourceGroup.ResourceId -and
-        $_.PolicyDefinitionId.EndsWith($PolicyDefinitionName) 
-    } 
-    | Select-Object -First 1
-
-    return $policyAssignment
 }
 
 <#
@@ -192,12 +159,12 @@ $networkSecurityGroup | Get-PolicyComplianceState -PolicyDefinition "OP-Audit-NS
 #>
 function Get-PolicyComplianceState {
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$PolicyDefinitionName,
+        [ValidateNotNull()]
+        [PSObject] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 60,
@@ -210,20 +177,10 @@ function Get-PolicyComplianceState {
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
     do {
-        # Get resource group.
-        $resourceGroup = Get-ResourceGroup -Resource $Resource
-                
-        # Get policy assignment.
-        $policyAssignment = Get-PolicyAssignment -ResourceGroup $resourceGroup -PolicyDefinitionName $PolicyDefinitionName
-
-        if ($null -eq $policyAssignment) {
-            throw "Policy '$($PolicyDefinitionName)' is not assigned to scope '$($resourceGroup.ResourceId)'."
-        }
-
         # Get policy state
         $policyState = Get-AzPolicyState `
-            -ResourceGroupName  $resourceGroup.ResourceGroupName `
-            -PolicyAssignmentName $policyAssignment.Name `
+            -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
+            -PolicyAssignmentName $TestContext.PolicyAssignment.Name `
             -Filter "ResourceId eq '$($Resource.Id)'"
 
         # Success: Policy compliance state is not null.
@@ -238,7 +195,7 @@ function Get-PolicyComplianceState {
         }
         # Failure: Policy compliance state still null after maximum retries.
         else {
-            throw "Policy '$($PolicyDefinitionName)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
+            throw "Policy '$($TestContext.PolicyDefinition.Name)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
         }
     } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
 
@@ -247,15 +204,9 @@ function Get-PolicyComplianceState {
 
 function New-PolicyAssignment {
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateNotNull()]
-        [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]$ResourceGroup,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject]$PolicyDefinition,
-        [Parameter()]
-        [ValidateNotNull()]
-        [Hashtable] $PolicyParameterObject = @{},
+        [PSObject] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 30,
@@ -266,20 +217,20 @@ function New-PolicyAssignment {
 
     # Assign policy to resource group.
     # 'DeployIfNotExists' and 'Modify' policies require a managed identity with the appropriated roles for remediation.
-    if ($PolicyDefinition.Properties.PolicyRule.Then.Effect -in "DeployIfNotExists", "Modify") {
+    if ($TestContext.PolicyDefinition.Properties.PolicyRule.Then.Effect -in "DeployIfNotExists", "Modify") {
         # Create policy assignment and managed identity.
         $policyAssignment = New-AzPolicyAssignment `
-            -Name $PolicyDefinition.Name `
-            -PolicyDefinition $PolicyDefinition `
-            -PolicyParameterObject $PolicyParameterObject `
-            -Scope $ResourceGroup.ResourceId `
-            -Location $ResourceGroup.Location `
+            -Name $TestContext.PolicyDefinition.Name `
+            -PolicyDefinition $TestContext.PolicyDefinition `
+            -PolicyParameterObject $TestContext.PolicyParameterObject `
+            -Scope $TestContext.ResourceGroup.ResourceId `
+            -Location $TestContext.ResourceGroup.Location `
             -AssignIdentity
 
         # Assign appropriated roles to managed identity by by directly invoking the Azure REST API.
         # Using 'New-AzRoleAssignment' would require higher privileges to query Azure Active Directoy.
         # See also: https://github.com/Azure/azure-powershell/issues/10550#issuecomment-784215221
-        $roleDefinitionIds = $PolicyDefinition.Properties.PolicyRule.Then.Details.RoleDefinitionIds
+        $roleDefinitionIds = $TestContext.PolicyDefinition.Properties.PolicyRule.Then.Details.RoleDefinitionIds
         foreach ($roleDefinitionId in $roleDefinitionIds) {
             # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
             # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
@@ -296,10 +247,10 @@ function New-PolicyAssignment {
                 } | ConvertTo-Json
 
                 $httpResponse = Invoke-AzRestMethod `
-                    -ResourceGroupName $ResourceGroup.ResourceGroupName `
+                    -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
                     -ResourceProviderName "Microsoft.Authorization" `
                     -ResourceType "roleAssignments" `
-                    -Name $PolicyDefinition.Name `
+                    -Name $TestContext.PolicyDefinition.Name `
                     -ApiVersion "2015-07-01" `
                     -Method "PUT" `
                     -Payload $payload
@@ -327,10 +278,10 @@ function New-PolicyAssignment {
     else {
         # Create policy assignment.
         $policyAssignment = New-AzPolicyAssignment `
-            -Name $PolicyDefinition.Name `
-            -PolicyDefinition $PolicyDefinition `
-            -PolicyParameterObject $PolicyParameterObject `
-            -Scope $ResourceGroup.ResourceId
+            -Name $TestContext.PolicyDefinition.Name `
+            -PolicyDefinition $TestContext.PolicyDefinition `
+            -PolicyParameterObject $TestContext.PolicyParameterObject `
+            -Scope $TestContext.ResourceGroup.ResourceId
     }
 
     # Re-login to make sure the policy assignment is applied.

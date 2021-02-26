@@ -13,7 +13,7 @@ function AzPolicyTest {
     )
 
     try {
-        # Generate id
+        # Generate id for the test.
         $TestContext.Id = "$((New-Guid).Guid)"
 
         # Create resource group for the test.
@@ -22,10 +22,7 @@ function AzPolicyTest {
             -Location $TestContext.Location
 
         # Assign policy to the resource group.
-        $TestContext.PolicyAssignment = New-PolicyAssignment `
-            -ResourceGroup $TestContext.ResourceGroup `
-            -PolicyDefinition $TestContext.PolicyDefinition `
-            -PolicyParameterObject $TestContext.PolicyParameterObject
+        $TestContext.PolicyAssignment = New-PolicyAssignment $testContext
 
         # Invoke the test.
         Invoke-Command -ScriptBlock $Test
@@ -69,7 +66,7 @@ function Initialize-AzPolicyTest {
         [Hashtable] $PolicyParameterObject = @{},
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string]$Location = (Get-ResourceLocationDefault)
+        [string]$Location = "northeurope"
     )
        
     $testContext = [PSCustomObject]@{ 

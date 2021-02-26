@@ -317,12 +317,17 @@ function New-PolicyDefinition {
     | Select-Object -Last 1
 
     if (-not $policyDefinitionResource) {
-        throw "Policy template file '$($testContext.PolicyTemplateFile)' does not contain policy definition resource."
+        throw "Policy template file '$($TestContext.PolicyTemplateFile)' does not contain policy definition resource."
     }
 
     # Replace name of the policy definition.
     $policyDefinitionResource.name = "$((New-Guid).Guid)"
     
+    # Replace display name of the policy definition.
+    if ($policyDefinitionResource.properties.displayname) {
+        $policyDefinitionResource.properties.displayname = $policyDefinitionResource.name
+    }
+
     # Create temporary policy template file.
     $templateFile = New-TemporaryFile
     try {
@@ -334,7 +339,7 @@ function New-PolicyDefinition {
         $deployment = $job | Wait-Job | Receive-Job
 
         if ($deployment.ProvisioningState -ne "Succeeded") {
-            throw "Policy template file '$($testContext.PolicyTemplateFile)' failed during deployment."
+            throw "Policy template file '$($TestContext.PolicyTemplateFile)' failed during deployment."
         }
     }
     finally {

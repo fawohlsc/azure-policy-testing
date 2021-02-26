@@ -226,13 +226,13 @@ function New-PolicyAssignment {
             -Location $TestContext.ResourceGroup.Location `
             -AssignIdentity
 
-        # Assign appropriated roles to managed identity by by directly invoking the Azure REST API.
+        # Assign appropriated roles to managed identity by directly invoking the Azure REST API.
         # Using 'New-AzRoleAssignment' would require higher privileges to query Azure Active Directoy.
         # See also: https://github.com/Azure/azure-powershell/issues/10550#issuecomment-784215221
         $roleDefinitionIds = $TestContext.PolicyDefinition.Properties.PolicyRule.Then.Details.RoleDefinitionIds
         foreach ($roleDefinitionId in $roleDefinitionIds) {
-            # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
-            # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
+            # Managed identity might not be created yet.
+            # Hence waiting a few seconds and retrying role assignment to avoid flaky tests.
             $retries = 0
             do {
                 # Wait for Azure Active Directory to replicate managed identity.
@@ -293,7 +293,13 @@ function New-PolicyDefinition {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext
+        [PSObject] $TestContext,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$WaitSeconds = 10,
+        [Parameter()]
+        [ValidateRange(1, [ushort]::MaxValue)]
+        [ushort]$MaxRetries = 6
     )
 
     # The maximum depth allowed for serialization is 100.
@@ -335,16 +341,31 @@ function New-PolicyDefinition {
         Remove-Item $templateFile -Force
     }
 
-    # Wait to make sure the policy definition is applied.
-    Start-Sleep -Seconds 30
-
-    # Re-login to make sure the policy definition is applied.
+    # Re-login to make sure policy definition is applied.
     Connect-Account
 
-    # Get policy definition
-    $policyDefinition = Get-AzPolicyDefinition -Name $policyDefinitionResource.Name
+    # Policy definition still might not be applied yet.
+    # Hence waiting a few seconds and retrying to avoid flaky tests.
+    $retries = 0
+    do {
+        # Wait for policy definition to be applied.
+        Start-Sleep -Seconds $WaitSeconds
 
-    return $policyDefinition
+        try {
+            return Get-AzPolicyDefinition `
+                -Name $policyDefinitionResource.Name `
+                -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
+        }
+        catch {
+            if ($retries -le $MaxRetries) {
+                $retries++
+                continue # Not required, just defensive programming.
+            }
+            else {
+                throw "Policy template file '$($testContext.PolicyTemplateFile)' was deployed, but policy definition '$($policyDefinitionResource.name)' was still not found even after $($MaxRetries) retries."
+            }
+        }
+    } while ($retries -le $MaxRetries)
 }
 
 function Connect-Account {

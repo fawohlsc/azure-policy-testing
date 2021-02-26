@@ -38,13 +38,12 @@ function Complete-PolicyComplianceScan {
         # Failure: Retry policy compliance scan when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
             $retries++
-            continue # Not required, just defensive programming.
         }
         # Failure: Policy compliance scan is still failing after maximum retries.
         else {
             throw "Policy compliance scan for resource group '$($TestContext.ResourceGroup.ResourceId)' failed even after $($MaxRetries) retries."
         }
-    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
+    } while ($retries -le $MaxRetries) # Prevent endless loop.
 }
 
 <#
@@ -110,7 +109,6 @@ function Complete-PolicyRemediation {
                 # Failure: No deployment was triggered, so retry when still below maximum retries.
                 elseif ($retries -le $MaxRetries) {
                     $retries++
-                    continue # Not required, just defensive programming.
                 }
                 # Failure: No deployment was triggered even after maximum retries.
                 else {
@@ -125,13 +123,12 @@ function Complete-PolicyRemediation {
         # Failure: Remediation failed, so retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
             $retries++
-            continue # Not required, just defensive programming.
         }
         # Failure: Remediation failed even after maximum retries.
         else {
             throw "Policy '$($TestContext.Policy)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
         }
-    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
+    } while ($retries -le $MaxRetries) # Prevent endless loop.
 }
 
 <#
@@ -182,23 +179,20 @@ function Get-PolicyComplianceState {
             -PolicyAssignmentName $TestContext.PolicyAssignment.Name `
             -Filter "ResourceId eq '$($Resource.Id)'"
 
-        # Success: Policy compliance state is not null.
-        if ($null -ne $policyState.IsCompliant) {
-            break
+        # Success: Policy compliance state is either compliant or non-compliant
+        if ($policyState.ComplianceState -in "Compliant", "NonCompliant") {
+            return $policyState.ComplianceState -eq "Compliant"
         }
         # Failure: Policy compliance state is null, so wait a few seconds and retry when still below maximum retries.
         elseif ($retries -le $MaxRetries) {
             Start-Sleep -Seconds $WaitSeconds
             $retries++
-            continue # Not required, just defensive programming.
         }
         # Failure: Policy compliance state still null after maximum retries.
         else {
             throw "Policy '$($TestContext.PolicyDefinition.Name)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
         }
-    } while ($retries -le $MaxRetries) # Prevent endless loop, just defensive programming.
-
-    return $policyState.IsCompliant
+    } while ($retries -le $MaxRetries) # Prevent endless loop.
 }
 
 function New-PolicyAssignment {
@@ -265,7 +259,6 @@ function New-PolicyAssignment {
                     ($retries -le $MaxRetries)
                 ) {
                     $retries++
-                    continue # Not required, just defensive programming.
                 }
                 # Error response describing why the operation failed.
                 else {
@@ -364,7 +357,6 @@ function New-PolicyDefinition {
         catch {
             if ($retries -le $MaxRetries) {
                 $retries++
-                continue # Not required, just defensive programming.
             }
             else {
                 throw "Policy template file '$($testContext.PolicyTemplateFile)' was deployed, but policy definition '$($policyDefinitionResource.name)' was still not found even after $($MaxRetries) retries."

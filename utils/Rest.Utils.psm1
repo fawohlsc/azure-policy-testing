@@ -85,7 +85,7 @@ function Wait-AsyncOperation {
             Start-Sleep -Second $retryAfter
             $retries++
         }
-    } until ($retries -gt $MaxRetries) # Prevent endless loop, just defensive programming.
+    } until ($retries -gt $MaxRetries) # Prevent endless loop.
 
     if ($retries -gt $MaxRetries) {
         throw "Status of asynchronous operation '$($statusPath)' could not be retrieved even after $($MaxRetries) retries."

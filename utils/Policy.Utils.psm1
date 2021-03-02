@@ -292,7 +292,7 @@ function New-PolicyDefinition {
         [ushort]$WaitSeconds = 10,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 6
+        [ushort]$MaxRetries = 5
     )
 
     # The maximum depth allowed for serialization is 100.
@@ -345,24 +345,29 @@ function New-PolicyDefinition {
     # Policy definition still might not be applied yet.
     # Hence waiting a few seconds and retrying to avoid flaky tests.
     $retries = 0
-    do {
-        # Wait for policy definition to be applied.
-        Start-Sleep -Seconds $WaitSeconds
-
+    while ($retries -le $MaxRetries) {
         try {
-            return Get-AzPolicyDefinition `
+            # Wait for policy definition to be applied.
+            Start-Sleep -Seconds $WaitSeconds
+
+            $policyDefinition = Get-AzPolicyDefinition `
                 -Name $policyDefinitionResource.Name `
                 -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
+
+            if ($null -ne $policyDefinition) {
+                return $policyDefinition
+            }
         }
         catch {
-            if ($retries -le $MaxRetries) {
-                $retries++
-            }
-            else {
-                throw "Policy template file '$($testContext.PolicyTemplateFile)' was deployed, but policy definition '$($policyDefinitionResource.name)' was still not found even after $($MaxRetries) retries."
-            }
+            # Do nothing, just retry.
         }
-    } while ($retries -le $MaxRetries)
+
+        $retries++
+    } 
+
+    if ($retries -gt $MaxRetries) {
+        throw "Policy template file '$($testContext.PolicyTemplateFile)' was deployed, but policy definition '$($policyDefinitionResource.name)' was still not found even after $($MaxRetries) retries."
+    }
 }
 
 function Connect-Account {

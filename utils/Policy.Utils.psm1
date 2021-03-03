@@ -228,7 +228,7 @@ function New-PolicyAssignment {
             # Managed identity might not be created yet.
             # Hence waiting a few seconds and retrying role assignment to avoid flaky tests.
             $retries = 0
-            do {
+            while ($retries -le $MaxRetries) {
                 # Wait for Azure Active Directory to replicate managed identity.
                 Start-Sleep -Seconds $WaitSeconds
 
@@ -248,23 +248,27 @@ function New-PolicyAssignment {
                     -Method "PUT" `
                     -Payload $payload
 
-                # Created - Returns information about the role assignment.
+                # Role assignment was successfully created.
                 if ($httpResponse.StatusCode -eq 201) {
                     break
                 }
                 # Azure Active Directory did not yet complete replicating the managed identity.
                 elseif (
                     ($httpResponse.StatusCode -eq 400) -and 
-                    ($httpResponse.Content -like "*PrincipalNotFound*") -and
-                    ($retries -le $MaxRetries)
+                    ($httpResponse.Content -like "*PrincipalNotFound*")
                 ) {
                     $retries++
+                    continue # Not required, just defensive programming.
                 }
                 # Error response describing why the operation failed.
                 else {
-                    throw "Operation failed with message: '$($httpResponse.Content)'"
+                    throw "Policy '$($testContext.Policy)' was assigned to scope '$($TestContext.ResourceGroup.ResourceId)', but assinging role '$($roleDefinitionId)' to its managed identity '$($policyAssignment.Identity.PrincipalId)' failed with message: '$($httpResponse.Content)'."
                 }
-            } while ($retries -le $MaxRetries)
+            } 
+
+            if ($retries -gt $MaxRetries) {
+                throw "Policy '$($testContext.Policy)' was assigned to scope '$($TestContext.ResourceGroup.ResourceId)', but assinging role '$($roleDefinitionId)' to its managed identity '$($policyAssignment.Identity.PrincipalId)' failed even after $($MaxRetries) retries."
+            }
         }
     }
     else {

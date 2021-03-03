@@ -26,6 +26,8 @@ function Complete-PolicyComplianceScan {
         [ushort]$MaxRetries = 3
     )
 
+
+
     # Policy compliance scan might fail, hence retrying to avoid flaky tests.
     $retries = 0
     do {
@@ -163,36 +165,36 @@ function Get-PolicyComplianceState {
         [PSObject] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$WaitSeconds = 60,
+        [ushort]$WaitSeconds = 30,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 30
+        [ushort]$MaxRetries = 60
     )
 
     # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
     # Hence waiting a few seconds and retrying to get the policy compliance state to avoid flaky tests.
     $retries = 0
-    do {
+    while ($retries -le $MaxRetries) {
+        # Wait for policy compliance state to be propagated.
+        Start-Sleep -Seconds $WaitSeconds
+
         # Get policy state
         $policyState = Get-AzPolicyState `
             -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
             -PolicyAssignmentName $TestContext.PolicyAssignment.Name `
             -Filter "ResourceId eq '$($Resource.Id)'"
 
-        # Success: Policy compliance state is either compliant or non-compliant
+        # Return policy compliance state, which can be either compliant or non compliant.
         if ($policyState.ComplianceState -in "Compliant", "NonCompliant") {
             return $policyState.ComplianceState -eq "Compliant"
         }
-        # Failure: Policy compliance state is null, so wait a few seconds and retry when still below maximum retries.
-        elseif ($retries -le $MaxRetries) {
-            Start-Sleep -Seconds $WaitSeconds
-            $retries++
-        }
-        # Failure: Policy compliance state still null after maximum retries.
-        else {
-            throw "Policy '$($TestContext.PolicyDefinition.Name)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state is null even after $($MaxRetries) retries."
-        }
-    } while ($retries -le $MaxRetries) # Prevent endless loop.
+        
+        $retries++
+    } 
+
+    if ($retries -gt $MaxRetries) {
+        throw "Policy '$($TestContext.PolicyDefinition.Name)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state could not be determined even after $($MaxRetries) retries."
+    }
 }
 
 function New-PolicyAssignment {

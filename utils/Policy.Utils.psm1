@@ -336,7 +336,7 @@ function New-PolicyDefinition {
     $retries = 0
     while ($retries -le $MaxRetries) {
         try {
-            # Wait for policy definition to be applied.
+            # Wait for policy definition to be propagated.
             Start-Sleep -Seconds $WaitSeconds
 
             $policyDefinition = Get-AzPolicyDefinition `

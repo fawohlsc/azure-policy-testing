@@ -29,6 +29,7 @@ function Complete-PolicyComplianceScan {
     # Policy compliance scan might fail, hence retrying to avoid flaky tests.
     $retries = 0
     while ($retries -le $MaxRetries) {
+        # Trigger policy compliance scan and wait for its completion.
         $job = Start-AzPolicyComplianceScan -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName -PassThru -AsJob 
         $succeeded = $job | Wait-Job | Receive-Job
         
@@ -85,8 +86,8 @@ function Complete-PolicyRemediation {
     # This race condition could lead to a successful remediation without any deployment being triggered.
     # When a deployment is expected, it might be required to retry remediation to avoid flaky tests.
     $retries = 0
-    do {
-        # Trigger and wait for remediation.
+    while ($retries -le $MaxRetries) {
+        # Trigger remediation and wait for its completion.
         $job = Start-AzPolicyRemediation `
             -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
             -Scope $Resource.Id `
@@ -94,39 +95,25 @@ function Complete-PolicyRemediation {
             -ResourceDiscoveryMode ReEvaluateCompliance `
             -AsJob
         $remediation = $job | Wait-Job | Receive-Job
-        
-        # Check remediation provisioning state and deployment when required .
+
+        # Remediation was successful.
         if ($remediation.ProvisioningState -eq "Succeeded") {
-            if ($CheckDeployment) {
-                $deployed = $remediation.DeploymentSummary.TotalDeployments -gt 0
-                
-                # Success: Deployment was triggered.
-                if ($deployed) {
-                    break 
-                }
-                # Failure: No deployment was triggered, so retry when still below maximum retries.
-                elseif ($retries -le $MaxRetries) {
-                    $retries++
-                }
-                # Failure: No deployment was triggered even after maximum retries.
-                else {
-                    throw "Policy '$($TestContext.Policy)' succeeded to remediated resource '$($Resource.Id)', but no deployment was triggered even after $($MaxRetries) retries."
-                }
+            # No deployment is expected.
+            if (-not $CheckDeployment) {
+                break
             }
-            # Success: No deployment need to checked, hence no retry required.
-            else {
+            # Deployment is expected and was successfully executed.
+            elseif ($remediation.DeploymentSummary.TotalDeployments -gt 0) {
                 break
             }
         }
-        # Failure: Remediation failed, so retry when still below maximum retries.
-        elseif ($retries -le $MaxRetries) {
-            $retries++
-        }
-        # Failure: Remediation failed even after maximum retries.
-        else {
-            throw "Policy '$($TestContext.Policy)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
-        }
-    } while ($retries -le $MaxRetries) # Prevent endless loop.
+
+        $retries++
+    } 
+
+    if ($retries -gt $MaxRetries) {
+        throw "Policy '$($TestContext.Policy)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
+    }
 }
 
 <#

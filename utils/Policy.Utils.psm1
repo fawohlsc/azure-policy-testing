@@ -247,20 +247,20 @@ function New-PolicyAssignment {
                     -ApiVersion "2015-07-01" `
                     -Method "PUT" `
                     -Payload $payload
-
-                # Role assignment was successfully created.
-                if ($httpResponse.StatusCode -eq 201) {
-                    break
-                }
+                
                 # Azure Active Directory did not yet complete replicating the managed identity.
-                elseif (
+                if (
                     ($httpResponse.StatusCode -eq 400) -and 
                     ($httpResponse.Content -like "*PrincipalNotFound*")
                 ) {
                     $retries++
                     continue # Not required, just defensive programming.
                 }
-                # Error response describing why the operation failed.
+                # Role assignment was successfully created.
+                elseif ($httpResponse.StatusCode -eq 201) {
+                    break
+                }
+                # Role assignment failed.
                 else {
                     throw "Policy '$($testContext.Policy)' was assigned to scope '$($TestContext.ResourceGroup.ResourceId)', but assinging role '$($roleDefinitionId)' to its managed identity '$($policyAssignment.Identity.PrincipalId)' failed with message: '$($httpResponse.Content)'."
                 }

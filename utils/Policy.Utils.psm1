@@ -336,7 +336,7 @@ function New-PolicyDefinition {
         $deployment = $job | Wait-Job | Receive-Job
 
         if ($deployment.ProvisioningState -ne "Succeeded") {
-            throw "Policy template file '$($TestContext.PolicyTemplateFile)' failed during deployment."
+            throw "Policy template file '$($TestContext.PolicyTemplateFile)' failed during deployment with correlation id '$($deployment.CorrelationId)'."
         }
     }
     finally {

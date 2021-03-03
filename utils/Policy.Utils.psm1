@@ -26,26 +26,22 @@ function Complete-PolicyComplianceScan {
         [ushort]$MaxRetries = 3
     )
 
-
-
     # Policy compliance scan might fail, hence retrying to avoid flaky tests.
     $retries = 0
-    do {
+    while ($retries -le $MaxRetries) {
         $job = Start-AzPolicyComplianceScan -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName -PassThru -AsJob 
         $succeeded = $job | Wait-Job | Receive-Job
         
         if ($succeeded) {
             break
         }
-        # Failure: Retry policy compliance scan when still below maximum retries.
-        elseif ($retries -le $MaxRetries) {
-            $retries++
-        }
-        # Failure: Policy compliance scan is still failing after maximum retries.
-        else {
-            throw "Policy compliance scan for resource group '$($TestContext.ResourceGroup.ResourceId)' failed even after $($MaxRetries) retries."
-        }
-    } while ($retries -le $MaxRetries) # Prevent endless loop.
+
+        $retries++
+    } 
+
+    if ($retries -gt $MaxRetries) {
+        throw "Policy compliance scan for resource group '$($TestContext.ResourceGroup.ResourceId)' failed even after $($MaxRetries) retries."
+    }
 }
 
 <#

@@ -287,47 +287,31 @@ function New-PolicyDefinition {
     # The maximum depth allowed for serialization is 100.
     $depth = 100 
     
-    # Deserialize the template file.
-    $template = Get-Content -Path $TestContext.PolicyTemplateFile -Raw | ConvertFrom-Json -Depth $depth
+    # Deserialize the policy file.
+    $policy = Get-Content -Path $TestContext.PolicyFile -Raw | ConvertFrom-Json -Depth $depth
     
-    # Change template schema to subscription deployment template.
-    $template.'$schema' = "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#"
-
-    # Search for policy definition.
-    $policyDefinitionResource = $template.resources 
-    | Where-Object { $_.type -eq "Microsoft.Authorization/policyDefinitions" } 
-    | Select-Object -Last 1
-
-    if (-not $policyDefinitionResource) {
-        throw "Policy template file '$($TestContext.PolicyTemplateFile)' does not contain policy definition resource."
-    }
-
     # Replace name of the policy definition.
-    $policyDefinitionResource.name = "$((New-Guid).Guid)"
+    $policy.name = "$((New-Guid).Guid)"
     
-    # Replace display name of the policy definition.
-    if ($policyDefinitionResource.properties.displayname) {
-        $policyDefinitionResource.properties.displayname = $policyDefinitionResource.name
-    }
+    # Replace id of the policy definition.
+    $policy.id = "/subscriptions/$($TestContext.Subscription.Id)/providers/Microsoft.Authorization/policyDefinitions/$($policyDefinition.name)"
 
-    # Create temporary policy template file.
-    $templateFile = New-TemporaryFile
-    try {
-        # Serialize to temporary policy template file.
-        $template | ConvertTo-Json -Depth $depth | Out-File $templateFile.FullName
+    # Create policy definition at subscription scope.
+    $payload = $policy | ConvertTo-Json -Depth $depth
+    $httpResponse = Invoke-AzRestMethod `
+        -SubscriptionId $TestContext.Subscription.Id `
+        -ResourceProviderName "Microsoft.Authorization" `
+        -ResourceType "policyDefinitions" `
+        -Name $policy.name `
+        -ApiVersion "2020-09-01" `
+        -Method "PUT" `
+        -Payload $payload
+                
+    # Creating policy definition failed.
+    if ($httpResponse.StatusCode -ne 201) {
+        throw "Policy '$($testContext.Policy)' could not be defined at scope '/subscriptions/$($TestContext.Subscription.Id)' and failed with message: '$($httpResponse.Content)'."
+    }
     
-        # Deploy temporary policy template file at subscription scope.
-        $job = New-AzDeployment -templateFile $templateFile -Location $TestContext.Location -AsJob
-        $deployment = $job | Wait-Job | Receive-Job
-
-        if ($deployment.ProvisioningState -ne "Succeeded") {
-            throw "Policy template file '$($TestContext.PolicyTemplateFile)' failed during deployment with correlation id '$($deployment.CorrelationId)'."
-        }
-    }
-    finally {
-        Remove-Item $templateFile -Force
-    }
-
     # Re-login to make sure policy definition is applied.
     Connect-Account
 
@@ -340,7 +324,7 @@ function New-PolicyDefinition {
             Start-Sleep -Seconds $WaitSeconds
 
             $policyDefinition = Get-AzPolicyDefinition `
-                -Name $policyDefinitionResource.Name `
+                -Name $policy.name `
                 -ErrorAction Stop # Otherwise no exception would be thrown, since $ErrorActionPreference defaults to 'Continue' in PowerShell.
 
             if ($null -ne $policyDefinition) {
@@ -355,7 +339,7 @@ function New-PolicyDefinition {
     } 
 
     if ($retries -gt $MaxRetries) {
-        throw "Policy template file '$($testContext.PolicyTemplateFile)' was deployed, but policy definition '$($policyDefinitionResource.name)' was still not found even after $($MaxRetries) retries."
+        throw "Policy '$($testContext.Policy)' was defined at scope '/subscriptions/$($TestContext.Subscription.Id)', but policy definition '$($policy.name)' was still not found even after $($MaxRetries) retries."
     }
 }
 

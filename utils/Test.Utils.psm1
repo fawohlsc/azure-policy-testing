@@ -59,7 +59,7 @@ function Initialize-AzPolicyTest {
         [string] $Policy,
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string] $PolicyTemplateFile,
+        [string] $PolicyFile,
         [Parameter()]
         [ValidateNotNull()]
         [Hashtable] $PolicyParameterObject = @{},
@@ -71,11 +71,12 @@ function Initialize-AzPolicyTest {
     $testContext = [PSCustomObject]@{ 
         Id                    = $null
         Policy                = $null
-        PolicyTemplateFile    = $null
+        PolicyFile            = $null
         PolicyDefinition      = $null
         PolicyAssignment      = $null
         PolicyParameterObject = $PolicyParameterObject
         ResourceGroup         = $null
+        Subscription          = (Get-AzSubscription)
         Location              = $Location
     }
 
@@ -88,18 +89,18 @@ function Initialize-AzPolicyTest {
         $testContext.Policy = (Split-Path $MyInvocation.PSCommandPath -Leaf) -replace ".Tests.ps1", ""
     }
 
-    # Initialize policy template file.
-    if ($PolicyTemplateFile) {
-        $testContext.PolicyTemplateFile = $PolicyTemplateFile
+    # Initialize policy file.
+    if ($PolicyFile) {
+        $testContext.PolicyFile = $PolicyFile
     }
     else {
         # Determine policy path by test file path.
-        $policyTemplateDirectory = (Get-Item $MyInvocation.PSCommandPath).Directory.Parent.FullName + [IO.Path]::DirectorySeparatorChar + "policies" + [IO.Path]::DirectorySeparatorChar
-        $testContext.PolicyTemplateFile = $policyTemplateDirectory + $testContext.Policy + ".json"
+        $policyDirectory = (Get-Item $MyInvocation.PSCommandPath).Directory.Parent.FullName + [IO.Path]::DirectorySeparatorChar + "policies" + [IO.Path]::DirectorySeparatorChar
+        $testContext.PolicyFile = $policyDirectory + $testContext.Policy + ".json"
     }
 
-    if (-not (Test-Path $testContext.PolicyTemplateFile)) {
-        throw "Policy '$($testContext.Policy)' was not found at '$($testContext.PolicyTemplateFile)'."
+    if (-not (Test-Path $testContext.PolicyFile)) {
+        throw "Policy '$($testContext.Policy)' was not found at '$($testContext.PolicyFile)'."
     }
 
     # Create policy definition at subscription scope

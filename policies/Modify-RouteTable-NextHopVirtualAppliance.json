@@ -1,79 +1,66 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "variables": {
-        "policyName": "Modify-RouteTable-NextHopVirtualAppliance",
-        "policyDescription": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
-        "policyCategory": "Network",
-        // Built-in role 'Network Contributor'.
-        "policyRoleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
-    },
-    "resources": [
-        {
-            "name": "[variables('policyName')]",
-            "type": "Microsoft.Authorization/policyDefinitions",
-            "apiVersion": "2020-03-01",
-            "properties": {
-                "policyType": "Custom",
-                "mode": "All",
-                "displayName": "[variables('policyName')]",
-                "description": "[variables('policyDescription')]",
+    "properties": {
+        "displayName": "Modify-RouteTable-NextHopVirtualAppliance-Ring",
+        "description": "Adds route with address prefix 0.0.0.0/0 pointing to the virtual appliance in case there is none. Best combined with policy deny-route-nexthopvirtualappliance to ensure the correct IP address of the virtual appliance.",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+            "category": "Network"
+        },
+        "parameters": {
+            "routeTableSettings": {
+                "type": "Object",
                 "metadata": {
-                    "category": "[variables('policyCategory')]"
-                },
-                "parameters": {
-                    "routeTableSettings": {
-                        "type": "Object",
-                        "metadata": {
-                            "displayName": "Route Table Settings",
-                            "description": "Location-specific settings for route tables."
-                        }
-                    }
-                },
-                "policyRule": {
-                    "if": {
-                        "allOf": [
-                            {
-                                "field": "type",
-                                "equals": "Microsoft.Network/routeTables"
-                            },
-                            {
-                                "count": {
-                                    "field": "Microsoft.Network/routeTables/routes[*]",
-                                    "where": {
-                                        "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
-                                        "equals": "0.0.0.0/0"
-                                    }
-                                },
-                                "equals": 0
-                            }
-                        ]
+                    "displayName": "Route Table Settings",
+                    "description": "Location-specific settings for route tables."
+                }
+            }
+        },
+        "policyRule": {
+            "if": {
+                "allOf": [
+                    {
+                        "field": "type",
+                        "equals": "Microsoft.Network/routeTables"
                     },
-                    "then": {
-                        "effect": "modify",
-                        "details": {
-                            "roleDefinitionIds": [
-                                "[variables('policyRoleDefinitionId')]"
-                            ],
-                            "conflictEffect": "audit",
-                            "operations": [
-                                {
-                                    "operation": "add",
-                                    "field": "Microsoft.Network/routeTables/routes[*]",
-                                    "value": {
-                                        "name": "default",
-                                        "properties": {
-                                            "addressPrefix": "0.0.0.0/0",
-                                            "nextHopType": "VirtualAppliance",
-                                            "nextHopIpAddress": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
+                    {
+                        "count": {
+                            "field": "Microsoft.Network/routeTables/routes[*]",
+                            "where": {
+                                "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
+                                "equals": "0.0.0.0/0"
+                            }
+                        },
+                        "equals": 0
                     }
+                ]
+            },
+            "then": {
+                "effect": "modify",
+                "details": {
+                    "roleDefinitionIds": [
+                        "/providers/microsoft.authorization/roleDefinitions/4d97b98b-1d4f-4787-a291-c67834d212e7"
+                    ],
+                    "conflictEffect": "audit",
+                    "operations": [
+                        {
+                            "operation": "add",
+                            "field": "Microsoft.Network/routeTables/routes[*]",
+                            "value": {
+                                "name": "default",
+                                "properties": {
+                                    "addressPrefix": "0.0.0.0/0",
+                                    "nextHopType": "VirtualAppliance",
+                                    "nextHopIpAddress": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
+                                }
+                            }
+                        }
+                    ]
                 }
             }
         }
-    ]
+    },
+    "id": "/providers/Microsoft.Management/managementGroups/fawohlsc/providers/Microsoft.Authorization/policyDefinitions/58de400d-ea80-4d2c-88e8-bc3e59aae7db",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "name": "58de400d-ea80-4d2c-88e8-bc3e59aae7db"
 }

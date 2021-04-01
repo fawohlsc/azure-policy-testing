@@ -1,101 +1,90 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "variables": {
-        "policyName": "Deny-Route-NextHopVirtualAppliance",
-        "policyDescription": "Deny route with address prefix 0.0.0.0/0 not pointing to the virtual appliance. Both creating routes as a standalone resource or nested within their parent resource route table are considered.",
-        "policyCategory": "Network"
-    },
-    "resources": [
-        {
-            "name": "[variables('policyName')]",
-            "type": "Microsoft.Authorization/policyDefinitions",
-            "apiVersion": "2020-03-01",
-            "properties": {
-                "policyType": "Custom",
-                "mode": "All",
-                "displayName": "[variables('policyName')]",
-                "description": "[variables('policyDescription')]",
+    "properties": {
+        "displayName": "Deny-Route-NextHopVirtualAppliance",
+        "description": "Deny route with address prefix 0.0.0.0/0 not pointing to the virtual appliance. Both creating routes as a standalone resource or nested within their parent resource route table are considered.",
+        "policyType": "Custom",
+        "mode": "All",
+        "metadata": {
+            "category": "Network"
+        },
+        "parameters": {
+            "routeTableSettings": {
+                "type": "Object",
                 "metadata": {
-                    "category": "[variables('policyCategory')]"
-                },
-                "parameters": {
-                    "routeTableSettings": {
-                        "type": "Object",
-                        "metadata": {
-                            "displayName": "Route Table Settings",
-                            "description": "Location-specific settings for route tables."
-                        }
-                    }
-                },
-                "policyRule": {
-                    "if": {
-                        "anyOf": [
+                    "displayName": "Route Table Settings",
+                    "description": "Location-specific settings for route tables."
+                }
+            }
+        },
+        "policyRule": {
+            "if": {
+                "anyOf": [
+                    {
+                        "allOf": [
                             {
-                                "allOf": [
-                                    {
-                                        "field": "type",
-                                        "equals": "Microsoft.Network/routeTables"
-                                    },
-                                    {
-                                        "count": {
-                                            "field": "Microsoft.Network/routeTables/routes[*]",
-                                            "where": {
-                                                "allOf": [
+                                "field": "type",
+                                "equals": "Microsoft.Network/routeTables"
+                            },
+                            {
+                                "count": {
+                                    "field": "Microsoft.Network/routeTables/routes[*]",
+                                    "where": {
+                                        "allOf": [
+                                            {
+                                                "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
+                                                "equals": "0.0.0.0/0"
+                                            },
+                                            {
+                                                "anyOf": [
                                                     {
-                                                        "field": "Microsoft.Network/routeTables/routes[*].addressPrefix",
-                                                        "equals": "0.0.0.0/0"
+                                                        "field": "Microsoft.Network/routeTables/routes[*].nextHopType",
+                                                        "notEquals": "VirtualAppliance"
                                                     },
                                                     {
-                                                        "anyOf": [
-                                                            {
-                                                                "field": "Microsoft.Network/routeTables/routes[*].nextHopType",
-                                                                "notEquals": "VirtualAppliance"
-                                                            },
-                                                            {
-                                                                "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
-                                                                "notEquals": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
-                                                            }
-                                                        ]
+                                                        "field": "Microsoft.Network/routeTables/routes[*].nextHopIpAddress",
+                                                        "notEquals": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
                                                     }
                                                 ]
                                             }
-                                        },
-                                        "greater": 0
+                                        ]
                                     }
-                                ]
+                                },
+                                "greater": 0
+                            }
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {
+                                "field": "type",
+                                "equals": "Microsoft.Network/routeTables/routes"
                             },
                             {
-                                "allOf": [
+                                "field": "Microsoft.Network/routeTables/routes/addressPrefix",
+                                "equals": "0.0.0.0/0"
+                            },
+                            {
+                                "anyOf": [
                                     {
-                                        "field": "type",
-                                        "equals": "Microsoft.Network/routeTables/routes"
+                                        "field": "Microsoft.Network/routeTables/routes/nextHopType",
+                                        "notEquals": "VirtualAppliance"
                                     },
                                     {
-                                        "field": "Microsoft.Network/routeTables/routes/addressPrefix",
-                                        "equals": "0.0.0.0/0"
-                                    },
-                                    {
-                                        "anyOf": [
-                                            {
-                                                "field": "Microsoft.Network/routeTables/routes/nextHopType",
-                                                "notEquals": "VirtualAppliance"
-                                            },
-                                            {
-                                                "field": "Microsoft.Network/routeTables/routes/nextHopIpAddress",
-                                                "notEquals": "[[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
-                                            }
-                                        ]
+                                        "field": "Microsoft.Network/routeTables/routes/nextHopIpAddress",
+                                        "notEquals": "[parameters('routeTableSettings')[field('location')].virtualApplianceIpAddress]"
                                     }
                                 ]
                             }
                         ]
-                    },
-                    "then": {
-                        "effect": "deny"
                     }
-                }
+                ]
+            },
+            "then": {
+                "effect": "deny"
             }
         }
-    ]
+    },
+    "id": "/providers/Microsoft.Management/managementGroups/fawohlsc/providers/Microsoft.Authorization/policyDefinitions/5378d48e-4ae3-4e71-a032-3d77f94f7cde",
+    "type": "Microsoft.Authorization/policyDefinitions",
+    "name": "5378d48e-4ae3-4e71-a032-3d77f94f7cde"
 }

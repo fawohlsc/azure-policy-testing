@@ -1,4 +1,5 @@
 Import-Module -Name Az.Resources
+. "$($PSScriptRoot)/TestContext.ps1"
 
 <#
 .SYNOPSIS

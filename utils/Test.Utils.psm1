@@ -1,5 +1,6 @@
 Import-Module -Name Az.Resources
 Import-Module "$($PSScriptRoot)/Policy.Utils.psm1" -Force
+. "$($PSScriptRoot)/TestContext.ps1"
 
 function AzPolicyTest {
     param (
@@ -67,19 +68,16 @@ function Initialize-AzPolicyTest {
         [ValidateNotNullOrEmpty()]
         [string]$Location = "northeurope"
     )
-       
-    $testContext = [PSCustomObject]@{ 
-        Id                    = $null
-        Policy                = $null
-        PolicyFile            = $null
-        PolicyDefinition      = $null
-        PolicyAssignment      = $null
-        PolicyParameterObject = $PolicyParameterObject
-        ResourceGroup         = $null
-        Subscription          = (Get-AzSubscription)
-        Location              = $Location
-    }
 
+    #[TestContext] $testContext = [TestContext]::new()
+    $testContext = New-Object TestContext
+
+    # Initialize location.
+    $testContext.Location = $Location
+
+    # Initialize subscription.
+    $testContext.Subscription = (Get-AzContext).Subscription
+    
     # Initialize policy.
     if ($Policy) {
         $testContext.Policy = $Policy
@@ -103,8 +101,11 @@ function Initialize-AzPolicyTest {
         throw "Policy '$($testContext.Policy)' was not found at '$($testContext.PolicyFile)'."
     }
 
-    # Create policy definition at subscription scope
+    # Create policy definition at subscription scope.
     $testContext.PolicyDefinition = New-PolicyDefinition $testContext
+
+    # Initialize policy parameter object.
+    $testContext.PolicyParameterObject = $PolicyParameterObject
 
     return $testContext
 }

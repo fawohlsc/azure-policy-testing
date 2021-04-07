@@ -4,6 +4,7 @@ Import-Module "$($PSScriptRoot)/../utils/Policy.Utils.psm1" -Force
 Import-Module "$($PSScriptRoot)/../utils/Rest.Utils.psm1" -Force
 Import-Module "$($PSScriptRoot)/../utils/RouteTable.Utils.psm1" -Force
 Import-Module "$($PSScriptRoot)/../utils/Test.Utils.psm1" -Force
+. "$($PSScriptRoot)/../utils/TestContext.ps1"
 
 Describe "Testing policy 'Deny-Route-NextHopVirtualAppliance'" -Tag "deny-route-nexthopvirtualappliance" {
     BeforeAll {

@@ -69,9 +69,8 @@ function Initialize-AzPolicyTest {
         [string]$Location = "northeurope"
     )
 
-    #[TestContext] $testContext = [TestContext]::new()
-    $testContext = New-Object TestContext
-
+    $testContext = [TestContext]::new()
+    
     # Initialize location.
     $testContext.Location = $Location
 

@@ -1,5 +1,3 @@
-Import-Module -Name Az.Resources
-
 <#
 .SYNOPSIS
 Await an asynchronous operation against the Azure REST API.

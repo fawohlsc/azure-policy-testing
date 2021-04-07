@@ -1,5 +1,3 @@
-Import-Module -Name Az.Resources
-
 class TestContext {
     # Properties
     [String] $Id 

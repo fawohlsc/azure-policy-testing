@@ -1,6 +1,3 @@
-Import-Module -Name Az.Resources
-. "$($PSScriptRoot)/TestContext.ps1"
-
 <#
 .SYNOPSIS
 Completes a policy compliance scan.
@@ -21,7 +18,7 @@ function Complete-PolicyComplianceScan {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext,
+        [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$MaxRetries = 3
@@ -75,7 +72,7 @@ function Complete-PolicyRemediation {
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext,
+        [TestContext] $TestContext,
         [Parameter()]
         [switch]$CheckDeployment,
         [Parameter()]
@@ -146,7 +143,7 @@ function Get-PolicyComplianceState {
         [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext,
+        [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 30,
@@ -185,7 +182,7 @@ function New-PolicyAssignment {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext,
+        [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 30,
@@ -276,7 +273,7 @@ function New-PolicyDefinition {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext,
+        [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
         [ushort]$WaitSeconds = 10,

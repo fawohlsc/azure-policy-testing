@@ -1,7 +1,3 @@
-Import-Module -Name Az.Resources
-Import-Module "$($PSScriptRoot)/Policy.Utils.psm1" -Force
-. "$($PSScriptRoot)/TestContext.ps1"
-
 function AzPolicyTest {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
@@ -9,7 +5,7 @@ function AzPolicyTest {
         [ScriptBlock] $Test,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext
+        [TestContext] $TestContext
     )
 
     try {
@@ -44,7 +40,7 @@ function Clear-AzPolicyTest {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [PSObject] $TestContext
+        [TestContext] $TestContext
     )
 
     # Remove policy definition.

@@ -1,7 +1,3 @@
-Import-Module -Name Az.Network
-Import-Module -Name Az.Resources
-Import-Module "$($PSScriptRoot)/Rest.Utils.psm1" -Force
-
 function Get-Route {
     param (
         [Parameter(Mandatory = $true)]

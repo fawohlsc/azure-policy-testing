@@ -1,6 +1,5 @@
 class TestContext {
     # Properties
-    [String] $Id 
     [String] $Policy
     [String] $PolicyFile
     [PSObject] $PolicyDefinition

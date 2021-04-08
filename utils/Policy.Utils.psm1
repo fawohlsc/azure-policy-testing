@@ -196,7 +196,7 @@ function New-PolicyAssignment {
     if ($TestContext.PolicyDefinition.Properties.PolicyRule.Then.Effect -in "DeployIfNotExists", "Modify") {
         # Create policy assignment and managed identity.
         $policyAssignment = New-AzPolicyAssignment `
-            -Name $TestContext.Id `
+            -Name "$((New-Guid).Guid)" `
             -PolicyDefinition $TestContext.PolicyDefinition `
             -PolicyParameterObject $TestContext.PolicyParameterObject `
             -Scope $TestContext.ResourceGroup.ResourceId `
@@ -226,7 +226,7 @@ function New-PolicyAssignment {
                     -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
                     -ResourceProviderName "Microsoft.Authorization" `
                     -ResourceType "roleAssignments" `
-                    -Name $TestContext.Id `
+                    -Name "$((New-Guid).Guid)" `
                     -ApiVersion "2015-07-01" `
                     -Method "PUT" `
                     -Payload $payload
@@ -257,7 +257,7 @@ function New-PolicyAssignment {
     else {
         # Create policy assignment.
         $policyAssignment = New-AzPolicyAssignment `
-            -Name $TestContext.Id `
+            -Name "$((New-Guid).Guid)" `
             -PolicyDefinition $TestContext.PolicyDefinition `
             -PolicyParameterObject $TestContext.PolicyParameterObject `
             -Scope $TestContext.ResourceGroup.ResourceId

@@ -9,12 +9,9 @@ function AzPolicyTest {
     )
 
     try {
-        # Generate id for the test.
-        $TestContext.Id = "$((New-Guid).Guid)"
-
         # Create resource group for the test.
         $TestContext.ResourceGroup = New-AzResourceGroup `
-            -Name $TestContext.Id `
+            -Name "$((New-Guid).Guid)" `
             -Location $TestContext.Location
 
         # Assign policy to the resource group.

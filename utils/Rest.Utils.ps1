@@ -32,10 +32,10 @@ function Wait-AsyncOperation {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Profile.Models.PSHttpResponse]$HttpResponse,
+        [Microsoft.Azure.Commands.Profile.Models.PSHttpResponse] $HttpResponse,
         [Parameter()]
         [ValidateRange(1, [uint32]::MaxValue)]
-        [uint32]$MaxRetries = 100
+        [uint32] $MaxRetries = 100
     )
 
     # Asynchronous operations either return HTTP status code 201 (Created) or 202 (Accepted).
@@ -112,10 +112,10 @@ function Get-HttpResponseHeaderValues {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Profile.Models.PSHttpResponse]$HttpResponse,
+        [Microsoft.Azure.Commands.Profile.Models.PSHttpResponse] $HttpResponse,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$HeaderName
+        [string] $HeaderName
     )
 
     $headerValues = New-Object System.Collections.Generic.List[string] 

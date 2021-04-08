@@ -2,10 +2,10 @@ function Get-Route {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
+        [Microsoft.Azure.Commands.Network.Models.PSRouteTable] $RouteTable,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$AddressPrefix
+        [string] $AddressPrefix
     )
     
     $route = $RouteTable.Routes | Where-Object { 
@@ -38,10 +38,10 @@ function Invoke-RouteDelete {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
+        [Microsoft.Azure.Commands.Network.Models.PSRouteTable] $RouteTable,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRoute]$Route
+        [Microsoft.Azure.Commands.Network.Models.PSRoute] $Route
     )
 
     $httpResponse = Invoke-AzRestMethod `
@@ -109,19 +109,19 @@ function Invoke-RoutePut {
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSRouteTable]$RouteTable,
+        [Microsoft.Azure.Commands.Network.Models.PSRouteTable] $RouteTable,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$Name,
+        [string] $Name,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$AddressPrefix,
+        [string] $AddressPrefix,
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$NextHopType,
+        [string] $NextHopType,
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string]$NextHopIpAddress
+        [string] $NextHopIpAddress
     )
 
     $payload = @"

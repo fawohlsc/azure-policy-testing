@@ -1,13 +1,17 @@
-using module Az.Network
-using module Az.Resources
-using module "../utils/TestContext.psm1"
-using module  "../utils/Rest.Utils.psm1"
-using module  "../utils/Policy.Utils.psm1"
-using module  "../utils/Test.Utils.psm1"
-using module  "../utils/RouteTable.Utils.psm1"
-
 Describe "Testing policy 'Modify-RouteTable-NextHopVirtualAppliance'" -Tag "modify-routetable-nexthopvirtualappliance" {
     BeforeAll {
+        # Import modules.
+        Import-Module -Name Az.Network
+        Import-Module -Name Az.Resources
+
+        # Import utils by dot sourcing.
+        $utils = [IO.Path]::Combine((Split-Path $PSScriptRoot -Parent), "utils")
+        . "$($utils)/TestContext.ps1"
+        . "$($utils)/Rest.Utils.ps1"
+        . "$($utils)/Policy.Utils.ps1"
+        . "$($utils)/Test.Utils.ps1"
+        . "$($utils)/RouteTable.Utils.ps1"
+
         # Before all tests, initialize the test context and create an unique policy definition at subscription scope.
         [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUserDeclaredVarsMoreThanAssignments', '', Scope = 'Function')]
         $TestContext = Initialize-AzPolicyTest -PolicyParameterObject @{

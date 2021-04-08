@@ -21,7 +21,7 @@ function Complete-PolicyComplianceScan {
         [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 3
+        [ushort] $MaxRetries = 3
     )
 
     # Policy compliance scan might fail, hence retrying to avoid flaky tests.
@@ -69,15 +69,15 @@ function Complete-PolicyRemediation {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [string]$ResourceId,
+        [string] $ResourceId,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
         [TestContext] $TestContext,
         [Parameter()]
-        [switch]$CheckDeployment,
+        [switch] $CheckDeployment,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 3
+        [ushort] $MaxRetries = 3
     )
     
     # Remediation might be started before all previous changes on the resource in scope are completed.
@@ -140,16 +140,16 @@ function Get-PolicyComplianceState {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [string]$ResourceId,
+        [string] $ResourceId,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
         [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$WaitSeconds = 30,
+        [ushort] $WaitSeconds = 30,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 60
+        [ushort] $MaxRetries = 60
     )
 
     # Policy compliance scan might be completed, but policy compliance state might still be null due to race conditions.
@@ -185,10 +185,10 @@ function New-PolicyAssignment {
         [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$WaitSeconds = 30,
+        [ushort] $WaitSeconds = 30,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 10
+        [ushort] $MaxRetries = 10
     )
 
     # Assign policy to resource group.
@@ -276,10 +276,10 @@ function New-PolicyDefinition {
         [TestContext] $TestContext,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$WaitSeconds = 10,
+        [ushort] $WaitSeconds = 10,
         [Parameter()]
         [ValidateRange(1, [ushort]::MaxValue)]
-        [ushort]$MaxRetries = 5
+        [ushort] $MaxRetries = 5
     )
 
     # The maximum depth allowed for serialization is 100.

@@ -59,7 +59,7 @@ function Initialize-AzPolicyTest {
         [Hashtable] $PolicyParameterObject = @{},
         [Parameter()]
         [ValidateNotNullOrEmpty()]
-        [string]$Location = "northeurope"
+        [string] $Location = "northeurope"
     )
 
     $testContext = [TestContext]::new()

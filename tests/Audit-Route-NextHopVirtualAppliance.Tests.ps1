@@ -1,3 +1,11 @@
+using module Az.Network
+using module Az.Resources
+using module "../utils/TestContext.psm1"
+using module  "../utils/Rest.Utils.psm1"
+using module  "../utils/Policy.Utils.psm1"
+using module  "../utils/Test.Utils.psm1"
+using module  "../utils/RouteTable.Utils.psm1"
+
 Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-route-nexthopvirtualappliance" {
     BeforeAll {
         # Before all tests, initialize the test context and create an unique policy definition at subscription scope.

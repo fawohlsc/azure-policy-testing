@@ -45,8 +45,8 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
 
                 # Verify that route table is compliant.
                 Get-PolicyComplianceState `
-                    -Resource $routeTable `
-                    -TestContext $TestContext
+                    -TestContext $TestContext `
+                    -ResourceId $routeTable.Id
                 | Should -BeTrue
             }
         }
@@ -67,8 +67,8 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
 
                 # Verify that route table is incompliant.
                 Get-PolicyComplianceState `
-                    -Resource $routeTable `
-                    -TestContext $TestContext
+                    -TestContext $TestContext `
+                    -ResourceId $routeTable.Id
                 | Should -BeFalse
             }
         }

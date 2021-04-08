@@ -50,8 +50,8 @@ Completes a policy remediation.
 .DESCRIPTION
 Starts a remediation for a policy and awaits it's completion. In case of a failure, the policy remediation is retried (Default: 3 times).
 
-.PARAMETER Resource
-The resource to be remediated.
+.PARAMETER ResourceId
+The id of the resource to be remediated.
 
 .PARAMETER PolicyDefinitionName
 The name of the policy definition.
@@ -67,9 +67,9 @@ $routeTable | Complete-PolicyRemediation -PolicyDefinition "Modify-RouteTable-Ne
 #>
 function Complete-PolicyRemediation {
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
+        [string]$ResourceId,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
         [TestContext] $TestContext,
@@ -87,8 +87,8 @@ function Complete-PolicyRemediation {
     while ($retries -le $MaxRetries) {
         # Trigger remediation and wait for its completion.
         $job = Start-AzPolicyRemediation `
-            -Name "$($Resource.Name)-$([DateTimeOffset]::Now.ToUnixTimeSeconds())" `
-            -Scope $Resource.Id `
+            -Name $ResourceId `
+            -Scope $ResourceId `
             -PolicyAssignmentId $TestContext.PolicyAssignment.PolicyAssignmentId `
             -ResourceDiscoveryMode ReEvaluateCompliance `
             -AsJob
@@ -110,7 +110,7 @@ function Complete-PolicyRemediation {
     } 
 
     if ($retries -gt $MaxRetries) {
-        throw "Policy '$($TestContext.Policy)' failed to remediate resource '$($Resource.Id)' even after $($MaxRetries) retries."
+        throw "Policy '$($TestContext.Policy)' failed to remediate resource '$($ResourceId)' even after $($MaxRetries) retries."
     }
 }
 
@@ -121,8 +121,8 @@ Gets the policy compliance state of a resource.
 .DESCRIPTION
 Gets the policy compliance state of a resource. In case of a failure, getting the policy compliance state is retried (Default: 30 times) after a few seconds of waiting (Default: 60s).
 
-.PARAMETER Resource
-The resource to get the policy compliance state for. 
+.PARAMETER ResourceId
+The id of the resource to get the policy compliance state for. 
 
 .PARAMETER PolicyDefinitionName
 The name of the policy definition.
@@ -140,7 +140,7 @@ function Get-PolicyComplianceState {
     param (
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
-        [Microsoft.Azure.Commands.Network.Models.PSChildResource]$Resource,
+        [string]$ResourceId,
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
         [TestContext] $TestContext,
@@ -163,7 +163,7 @@ function Get-PolicyComplianceState {
         $policyState = Get-AzPolicyState `
             -ResourceGroupName $TestContext.ResourceGroup.ResourceGroupName `
             -PolicyAssignmentName $TestContext.PolicyAssignment.Name `
-            -Filter "ResourceId eq '$($Resource.Id)'"
+            -Filter "ResourceId eq '$($ResourceId)'"
 
         # Return policy compliance state, which can be either compliant or non compliant.
         if ($policyState.ComplianceState -in "Compliant", "NonCompliant") {
@@ -174,7 +174,7 @@ function Get-PolicyComplianceState {
     } 
 
     if ($retries -gt $MaxRetries) {
-        throw "Policy '$($TestContext.PolicyDefinition.Name)' completed compliance scan for resource '$($Resource.Id)', but policy compliance state could not be determined even after $($MaxRetries) retries."
+        throw "Policy '$($TestContext.PolicyDefinition.Name)' completed compliance scan for resource '$($ResourceId)', but policy compliance state could not be determined even after $($MaxRetries) retries."
     }
 }
 

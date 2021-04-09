@@ -87,7 +87,7 @@ function Complete-PolicyRemediation {
     while ($retries -le $MaxRetries) {
         # Trigger remediation and wait for its completion.
         $job = Start-AzPolicyRemediation `
-            -Name $ResourceId `
+            -Name "$((New-Guid).Guid)" `
             -Scope $ResourceId `
             -PolicyAssignmentId $TestContext.PolicyAssignment.PolicyAssignmentId `
             -ResourceDiscoveryMode ReEvaluateCompliance `

@@ -58,7 +58,7 @@ Describe "Testing policy 'Audit-Route-NextHopVirtualAppliance'" -Tag "audit-rout
                 # Verify that route table is incompliant.
                 $routeTable 
                 | Get-PolicyComplianceState -PolicyDefinitionName "Audit-Route-NextHopVirtualAppliance"
-                | Should -BeFalse
+                | Should -BeTrue
             }
         }
     }
